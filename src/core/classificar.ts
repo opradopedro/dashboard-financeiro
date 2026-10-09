@@ -4,12 +4,22 @@
 import type { Categoria, Conta, RegraCat, TipoTx, Transacao } from './tipos';
 import { diasEntre, norm } from './util';
 
-const CAIXINHA = / (caixinhas?|cofrinhos?|cofre|dinheiro reservado|dinheiro retirado|reservado|retirada da reserva|guardado|porquinho|aplicacao|aplic|resgate|cdb|lci|lca|tesouro direto|investimento|fundo de investimento|previdencia) /;
+const CAIXINHA = / (caixinhas?|cofrinhos?|cofre|dinheiro reservado|dinheiro retirado|reservado|reserva por|retirada da reserva|guardado|porquinho|aplicacao|aplic|resgate|cdb|lci|lca|tesouro direto|investimento|fundo de investimento|previdencia) /;
 const FATURA = / (pagamento (da |de )?fatura|pagto fatura|pgto fatura|pagamento cartao|pagamento de cartao|fatura cartao|pagamento recebido|pagamento efetuado|credit card payment) /;
 
-/** Tipo automático de uma transação, olhando só para ela (sem regra nem escolha sua). */
-export function tipoAuto(desc: string, valor: number, cartao: boolean): TipoTx {
+/** Pix/transferência de você para você mesmo: o nome do titular (2 primeiras palavras e a última) aparece na descrição. */
+export function ehTitular(desc: string, titular: string): boolean {
+  const p = norm(titular).trim().split(' ').filter(x => x.length > 1);
+  if (p.length < 2) return false;
   const t = norm(desc);
+  const chave = p.length > 2 ? [p[0], p[1], p[p.length - 1]] : p;
+  return / (pix|transf|ted|doc|deposit)/.test(t) && chave.every(x => t.includes(` ${x} `));
+}
+
+/** Tipo automático de uma transação, olhando só para ela (sem regra nem escolha sua). */
+export function tipoAuto(desc: string, valor: number, cartao: boolean, titular = ''): TipoTx {
+  const t = norm(desc);
+  if (!cartao && titular && ehTitular(desc, titular)) return 'interna';
   if (cartao) {
     // No cartão: entrada é pagamento da fatura ou estorno (estorno desconta do gasto, por isso "saída" positiva).
     if (valor > 0 && FATURA.test(t)) return 'fatura';
@@ -47,7 +57,7 @@ export interface Classificada extends Transacao {
   auto: boolean;      // tipo decidido pelo app (sem escolha sua nem regra de categoria)
 }
 
-export interface Contexto { contas: Conta[]; categorias: Categoria[]; regrasCat: RegraCat[] }
+export interface Contexto { contas: Conta[]; categorias: Categoria[]; regrasCat: RegraCat[]; titular?: string }
 
 /**
  * Classifica todas as transações. Além do tipo de cada uma, junta pares: o mesmo valor saindo de
@@ -61,7 +71,7 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
 
   const out: Classificada[] = txs.map(tx => {
     const cartao = tipoConta.get(tx.conta) === 'cartao';
-    let t: TipoTx = tx.tipo ?? tipoAuto(tx.desc, tx.valor, cartao);
+    let t: TipoTx = tx.tipo ?? tipoAuto(tx.desc, tx.valor, cartao, ctx.titular);
     let c: string | null = null;
     let auto = true;
     const d = norm(tx.desc);

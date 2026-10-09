@@ -10,3 +10,9 @@ backup*.json
 dashboard-financeiro-backup*.json
 finai-banco*.json
 *.local.*
+# Extratos e faturas (dados pessoais)
+*.pdf
+*.ofx
+Fatura*.csv
+Nubank_*.csv
+extrato*.csv

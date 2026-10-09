@@ -16,7 +16,7 @@ describe('exportação finai-banco/1', () => {
     expect(arq.formato).toBe(FORMATO);
     expect(arq.geradoEm).toMatch(/^2026-10-09T09:00:00[+-]\d{2}:\d{2}$/);
     expect(Object.keys(arq.contas[0])).toEqual(['id', 'banco', 'nome', 'tipo', 'saldo']);
-    expect(arq.contas.map(c => c.tipo)).toEqual(['corrente', 'cartao', 'cartao', 'cartao']);
+    expect(arq.contas.map(c => c.tipo)).toEqual(['corrente', 'cartao', 'cartao', 'cartao', 'corrente']);
     expect(Object.keys(arq.transacoes[0])).toEqual(['conta', 'data', 'descricao', 'valor', 'id']);
     expect(arq.transacoes.map(t => t.data)).toEqual(['2026-10-07', '2026-10-08']); // em ordem de data
   });

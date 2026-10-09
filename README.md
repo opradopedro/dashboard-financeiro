@@ -1,8 +1,9 @@
 # Dashboard Financeiro
 
 App Android de controle financeiro pessoal. Lê as notificações dos seus apps de banco (Mercado Pago,
-Nubank, Rico e outros que você escolher), transforma em transações com regras editáveis, importa
-extratos (CSV, Excel, OFX) sem duplicar e mostra entradas e saídas reais por mês e gastos por categoria.
+Nubank, Rico, Flash e outros que você escolher), transforma em transações com regras editáveis,
+importa extratos e faturas (PDF do Mercado Pago, CSV, Excel, OFX) sem duplicar e mostra entradas e
+saídas reais por mês e gastos por categoria.
 
 - **Tudo fica no aparelho.** O app não faz nenhuma chamada de rede e nem declara a permissão de internet.
 - Interface em português, valores em R$, datas dd/mm/aaaa, tema escuro.
@@ -31,7 +32,9 @@ Ao abrir, o app mostra um guia (também em **Ajustes → Guia de permissões**):
      *Abrir informações do app* → **⋮** (três pontinhos no canto de cima) → **Permitir
      configurações restritas** → confirme → volte e ative o acesso. Se o ⋮ não aparecer, tente
      ativar o acesso uma vez antes (o Android só mostra o menu depois de bloquear).
-2. **Bateria** — toque em *Liberar bateria* e escolha *Permitir*. Em Xiaomi, Samsung e Motorola
+2. **Avisos do app** — toque em *Permitir avisos* (Android 13 ou mais novo pergunta; nos mais
+   antigos já vem liberado). É o que mostra os botões Ignorar e Adicionar.
+3. **Bateria** — toque em *Liberar bateria* e escolha *Permitir*. Em Xiaomi, Samsung e Motorola
    vale também: informações do app → Bateria → **Sem restrições**.
 
 Em **Ajustes** aparece se o acesso está liberado, se o serviço está ativo e quantas notificações
@@ -53,9 +56,29 @@ Estorno no cartão desconta do gasto. Toque numa categoria para ver as transaç�
   *ignorada*, *sem regra*, *erro na regra*). Toque numa para **criar regra a partir dela** ou
   **reprocessar**.
 - **Simular notificação**: escolha o app, título e texto; ela entra pela mesma fila e regras das reais.
+- **Propagandas e avisos que não são compra** (cashback, novidades, limite) também ficam no
+  registro, como *sem regra*, mas **não viram transação**.
 
-### Regras de notificação
-Cada regra tem: app, padrão de texto (expressão regular), o que vira (entrada, saída,
+### Avisos com Ignorar e Adicionar
+Quando chega uma notificação de app monitorado que **ainda não tem regra**, o app mostra um aviso
+dele com dois botões, que funcionam com o app fechado:
+- **Adicionar**: cria sozinho uma regra a partir do texto (o valor em R$, o nome da loja ou da
+  pessoa, entrada ou saída e a conta do banco) e transforma esta e as próximas parecidas em
+  transação.
+- **Ignorar**: cria uma regra que ignora as próximas com o **mesmo título**. É assim que as
+  propagandas param de perguntar.
+
+O toque fica guardado no Android e é aplicado na próxima vez que o app abrir (o aviso mostra
+“Regra será criada”). Tocar no aviso abre a notificação no app, onde também há os dois botões.
+Em **Ajustes → Avisos** dá para escolher: só as sem regra (padrão), todas (nas que viraram
+transação, Ignorar desfaz) ou nunca.
+
+### Regras
+Ajustes → **Regras** mostra todas as regras de notificação e de categoria. Dá para **ordenar** por
+app, mais recentes ou mais antigas, e **filtrar pela origem**: vieram com o app, criadas por você,
+a partir de notificação (botão *Criar regra à mão*) ou automáticas (botões dos avisos).
+
+Cada regra de notificação tem: app, padrão de texto (expressão regular), o que vira (entrada, saída,
 transferência interna, pagamento de fatura, caixinha ou ignorar), se o dinheiro saiu ou entrou,
 conta de destino, prioridade e ativa/desativada. A de maior prioridade que casar decide.
 
@@ -63,7 +86,7 @@ O padrão é testado contra **título + quebra de linha + texto**, ignorando mai
 
 | Grupo | Para quê | Exemplo |
 |---|---|---|
-| `(?<valor>…)` | obrigatório | `R\$\s?(?<valor>[\d.]+,\d{2})` |
+| `(?<valor>…)` | obrigatório | `R\$\s?(?<valor>\d[\d.]*(?:,\d{2})?)` (aceita “R$ 1”) |
 | `(?<desc>…)` | descrição (loja, pessoa) | `em (?<desc>.+?)\.` |
 | `(?<data>…)` | opcional, dd/mm ou dd/mm/aaaa | `em (?<data>\d{2}/\d{2})` |
 
@@ -77,7 +100,18 @@ tipo e categoria, ou excluir. Marque *aplicar às parecidas* para o app aprender
 categoria).
 
 ### Importar extratos
-Aba **Importar**: escolha a conta e o arquivo (CSV, Excel .xlsx/.xls, OFX ou finai-banco/1 .json).
+Aba **Importar**: escolha a conta e o arquivo (PDF, CSV, Excel .xlsx/.xls, OFX ou finai-banco/1 .json).
+Formatos conferidos com arquivos reais:
+
+| Arquivo | Conta | Observação |
+|---|---|---|
+| Extrato da conta Mercado Pago (PDF) | Mercado Pago conta | lê descrição em várias linhas, número da operação (não duplica) e saldo |
+| Fatura Rico (CSV `Data;Estabelecimento;Portador;Valor;Parcela`) | Rico crédito | parcela entra na descrição (“LOJA - 2 de 3”) |
+| Fatura Nubank (CSV `date,title,amount`) | Nubank crédito | compras positivas: o sinal é invertido sozinho |
+| Extrato Flash (CSV com Saldo) | Flash alimentação | o saldo do arquivo atualiza o saldo da conta |
+
+Quando o arquivo traz **saldo** (PDF do Mercado Pago, Flash), o saldo da conta é atualizado com o
+do movimento mais recente.
 - CSV/Excel: confira o mapeamento de colunas na pré-visualização. Ele fica salvo como **modelo da
   conta** e é usado sozinho da próxima vez (mesmo cabeçalho). Fatura de cartão com compras
   positivas é detectada e o sinal é invertido (dá para mudar).
@@ -91,7 +125,12 @@ Aba **Importar**: escolha a conta e o arquivo (CSV, Excel .xlsx/.xls, OFX ou fin
 ### Categorias
 Categorização automática por palavras-chave (editáveis em Ajustes → Categorias; vence o trecho mais
 longo; `*` no fim = começo de palavra) e por regras criadas ao corrigir transações. O que ficou sem
-categoria aparece no painel (“Ver N sem categoria”).
+categoria aparece no painel (“Categorizar N transações”).
+
+### Seu nome
+Em **Ajustes → Seu nome**, escreva seu nome como aparece nos bancos. Pix de você para você mesmo
+(por exemplo “Pix recebido FULANO DE TAL” vindo de outra conta sua) passa a contar como
+transferência interna, e não como entrada.
 
 ### Dados
 Ajustes → Backup, restauração e exportação:
@@ -207,10 +246,30 @@ Kotlin. minSdk 24 (Android 7.0), targetSdk 36. Detalhes de arquitetura em `CLAUD
 - **Chave de assinatura EC P-256** (base64 curto para colar no celular), validade de 100 anos.
 - APK assinado com `apksigner` no workflow (a chave nunca passa pelo Gradle nem pelo repositório).
 
+- **Visual:** “caderno-caixa noturno”. Montserrat Alternates nos títulos e no nome do mês,
+  Montserrat (fonte variável) no texto e nos números leves com algarismos tabulares, as duas
+  embutidas no app. Cores de dados validadas para daltonismo no fundo escuro: entradas em azul,
+  saídas em cobre (verde × vermelho falhava para deuteranopia).
+- **Notificações reais conferidas:** Mercado Pago “Você recebeu R$ 1 / O valor que FULANO te
+  transferiu via Pix” (entrada) e “Você depositou R$ 0,01 via Pix” (transferência interna: é
+  dinheiro seu vindo de outra conta); Nubank “Recebemos sua transferência” (ignorada: a conta
+  Nubank não está entre as acompanhadas); Flash “Compra de R$ X em LOJA realizada” (saída na
+  conta Flash).
+- **Flash:** pacote `br.com.flashapp` (Flash Pay), conta “Flash alimentação” do tipo conta.
+- **Atualização dos dados (versão 2):** ao abrir a versão nova, o app acrescenta o Flash, as regras
+  novas e as palavras-chave novas; atualiza só as regras que vieram com o app e que você não
+  editou; e reprocessa as notificações que estavam sem regra.
+- **Avisos com o app fechado:** o Android decide se avisa usando uma cópia das regras (enviada
+  pelo app sempre que elas mudam); os botões ficam guardados e são aplicados quando o app abre.
+- **PDF:** lido com pdf.js, embutido no app (sem internet).
+
 ## O que é chute ou está pendente
 
-- **Regras iniciais das notificações** (Mercado Pago, Nubank, Rico): escritas sem ver notificações
-  reais. Ajuste com o editor e o teste ao vivo usando o registro.
+- **Regras iniciais das notificações:** Pix recebido e depósito (Mercado Pago), transferência
+  (Nubank) e compra (Flash) foram conferidas com notificações reais; as demais (compras no
+  Mercado Pago, Nubank e Rico, caixinha, fatura) ainda são chute. Use Adicionar/Ignorar ou o editor.
+- **Regra automática (Adicionar):** acerta o comum (valor, loja/pessoa, entrada/saída); confira a
+  conta e o tipo na primeira vez que usar com um app novo.
 - **Palavras-chave das categorias**: lista genérica vinda do carteira.
 - **Fabricantes agressivos com bateria** (Xiaomi/MIUI, alguns Samsung) podem parar o serviço
   mesmo com a bateria liberada; nesse caso o Android religa quando possível e o que estiver na

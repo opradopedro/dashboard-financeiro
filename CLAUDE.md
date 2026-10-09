@@ -43,11 +43,14 @@ src/
     util.ts        norm(), termoDe(), parseValor(), parseData(), datas
     classificar.ts tipo final + categoria (adaptado do carteira), resumoMes, serieMeses
     regras.ts      regra de notificação → transação (regex com grupos valor/desc/data)
+    automatica.ts  botões Adicionar/Ignorar: gerarRegraAuto, gerarRegraIgnorar, aplicarDecisoes
+    migracoes.ts   versões dos dados (v2: Flash, regras reais); regras-v1.json = regras padrão da v1
     ingestao.ts    fila → registro → regras → transação; reprocessar
     juntar.ts      deduplicação de extrato, revisão, conferência mensal
     finai.ts       exportar/ler finai-banco/1
     backup.ts      backup/restauração e sanear() (valida dados do banco local e de backups)
-  importar/        csv.ts, ofx.ts, planilha.ts (SheetJS, carregado sob demanda), mapear.ts, texto.ts
+  importar/        csv.ts, ofx.ts, pdf.ts (pdf.js; tabela Data/Descrição/ID/Valor/Saldo), planilha.ts
+                   (SheetJS sob demanda), mapear.ts (inclui saldo e parcela), texto.ts
   dados/db.ts      IndexedDB: um registro 'dados' com tudo, gravado inteiro a cada mudança
   nativo/notificacoes.ts  ponte com o plugin Kotlin (+ imitação para navegador)
   app.ts           estado, mudar() (fila de gravações), consumirFila(), classificadas() com cache
@@ -58,8 +61,10 @@ android/           projeto Capacitor versionado
     MainActivity.kt               registra o plugin
     notificacoes/Ouvinte.kt       NotificationListenerService (filtra pacote antes de ler)
     notificacoes/Fila.kt          SQLite: fila + chaves vistas (30 dias; repost igual em 2 min = mesma)
-    notificacoes/NotificacoesPlugin.kt  estado, fila, simular, atalhos de configuração,
-                                  salvarArquivo (ACTION_CREATE_DOCUMENT), botão voltar
+    notificacoes/NotificacoesPlugin.kt  estado, fila, decisões, regras, simular, atalhos de
+                                  configuração, permissão de avisos, salvarArquivo, voltar, rota
+    notificacoes/Avisos.kt        aviso do app com Ignorar/Adicionar (canal "avisos")
+    notificacoes/AcaoReceiver.kt  toque nos botões (app fechado) → Fila.decisoes
 .github/workflows/android.yml     testes → APK sem assinatura → apksigner → Release (+ espelho)
 ```
 
@@ -73,6 +78,11 @@ android/           projeto Capacitor versionado
    pacote por prioridade; `ignorar` → status ignorada; senão cria `Transacao` com origem
    notificação (ou liga a uma transação de extrato já existente).
 4. O simulador chama `nativo.simular`, que usa o mesmo `Fila.registrar` (mesmo filtro).
+5. Avisos: depois de gravar, `Avisos.talvezAvisar` testa a cópia das regras (Java regex, enviada
+   por `sincronizarNativo()`); sem regra → aviso com Ignorar/Adicionar. O toque grava em
+   `decisoes`; `consumirFila()` lê as decisões depois da fila e chama `aplicarDecisoes`.
+   Tocar no aviso abre `#/notif/<chave>` (extra "rota" → `rotaInicial()` ou evento `abrir`).
+   Regex do usuário que o Java não compila conta como "sem regra" só para o aviso.
 
 A lista de pacotes monitorados é enviada ao nativo por `enviarPacotes()` ao abrir e ao editar apps.
 Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INICIAIS`).
@@ -93,6 +103,15 @@ Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INI
 - Candidatos: mesma conta, mesmo valor, sem extrato, até 3 dias. Um só e até 1 dia → une
   (extrato prevalece; origens guardam como cada fonte chegou). Senão, revisão. Nenhum → nova.
 
+## Visual
+
+“Caderno-caixa noturno” (plano feito com a skill frontend-design). Tokens em `src/style.css`:
+noite #0E1420, lousa #161E2D, papel #E9EDF3, grafite #8E9AB0, champanhe #D9C8A4 (ações);
+dados: entrada #3B97C9, saída #CF7448 (validadas para daltonismo; verde/vermelho reprova).
+Fontes embutidas: Montserrat Alternates (títulos, nome do mês) e Montserrat variável (texto,
+números 300 tabulares). Evitar: rótulos em CAIXA ALTA, “·” como separador, “›”/“→” em botões,
+cartões iguais para tudo. A peça marcante é o topo do Painel (mês grande + frase + fita dupla).
+
 ## Convenções
 
 - TypeScript estrito, sem framework. Telas são funções `tela*(el, rota)` que montam HTML com
@@ -111,7 +130,10 @@ Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INI
 ## Decisões (resumo; detalhes no README)
 
 - appId `app.dashboardfinanceiro` — **não mudar** (mudaria o app instalado).
-- Regras de notificação podem ser `ignorar` (ex.: investimentos da Rico).
+- Regras de notificação podem ser `ignorar` (ex.: investimentos da Rico). Têm `origem`
+  (padrao, manual, notificacao, automatica) e `criadaEm`.
+- Formatos reais conferidos: PDF Mercado Pago, fatura Rico CSV, fatura Nubank CSV, extrato Flash CSV
+  (testes em `tests/extratos-reais.test.ts`, com dados trocados; nunca versionar arquivos do usuário).
 - versionCode = segundos desde 01/01/2026; tag `v1.<run_number>` (`.<tentativa>` em re-execução).
 - APK assinado no workflow com `apksigner` (v2+v3), chave EC P-256 em secrets:
   `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.

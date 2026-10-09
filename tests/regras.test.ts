@@ -10,7 +10,7 @@ const proc = (p: string, t: string, x: string) => processar(n(p, t, x), REGRAS_I
 
 describe('regra: grupos, valor, sinal e descrição', () => {
   const r: RegraNotif = { id: 'r', nome: 'r', pacote: 'x', padrao: String.raw`Compra de R\$\s?(?<valor>[\d.]+,\d{2}) em (?<desc>.+?) em (?<data>\d{2}/\d{2})`,
-    descricao: '', acao: 'saida', sentido: 'sai', conta: 'c', prioridade: 1, ativa: true };
+    descricao: '', acao: 'saida', sentido: 'sai', conta: 'c', prioridade: 1, ativa: true, origem: 'manual', criadaEm: '' };
   it('extrai os grupos e aplica o sentido', () => {
     const res = aplicarRegra(r, n('x', 'Cartão', 'Compra de R$ 1.234,56 em LOJA  X em 07/10'));
     expect(res?.status).toBe('transacao');
@@ -40,7 +40,7 @@ describe('regra: grupos, valor, sinal e descrição', () => {
 });
 
 describe('prioridade, app e ativa', () => {
-  const base: RegraNotif = { id: 'a', nome: 'a', pacote: 'p', padrao: String.raw`R\$ (?<valor>\d+,\d{2})`, acao: 'saida', sentido: 'sai', conta: 'nubank-cartao', prioridade: 1, ativa: true };
+  const base: RegraNotif = { id: 'a', nome: 'a', pacote: 'p', padrao: String.raw`R\$ (?<valor>\d+,\d{2})`, acao: 'saida', sentido: 'sai', conta: 'nubank-cartao', prioridade: 1, ativa: true, origem: 'manual', criadaEm: '' };
   it('maior prioridade vence; inativa e de outro app não contam', () => {
     const regras = [base, { ...base, id: 'b', prioridade: 5, acao: 'entrada' as const, sentido: 'entra' as const }, { ...base, id: 'c', prioridade: 9, ativa: false }, { ...base, id: 'd', prioridade: 99, pacote: 'outro' }];
     const res = processar(n('p', 't', 'R$ 3,00'), regras, CONTAS_INICIAIS);

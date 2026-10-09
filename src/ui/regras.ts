@@ -2,24 +2,62 @@
 // notificações já registradas.
 import { enviarPacotes, mudar, nomeApp, nomeConta, state } from '../app';
 import { aplicarRegra, sentidoPadrao, sugerirPadrao } from '../core/regras';
-import { ACOES, type AcaoRegra, type RegraNotif } from '../core/tipos';
+import { ACOES, ORIGENS_REGRA, TIPOS, type AcaoRegra, type OrigemRegra, type RegraNotif } from '../core/tipos';
 import { uid } from '../core/util';
 import { $, esc, fmtD, opcoes, sinal, toast } from './fmt';
 import { trocar, voltar, type Rota } from './nav';
 
-export function telaRegras(el: HTMLElement) {
+const ORDENS: [string, string][] = [['app', 'Por app'], ['recentes', 'Mais recentes'], ['antigas', 'Mais antigas']];
+
+export function telaRegras(el: HTMLElement, r: Rota) {
   const d = state.dados;
-  const pacotes = [...new Set([...d.apps.map(a => a.pacote), ...d.regras.map(r => r.pacote)])];
-  el.innerHTML = `<div class="panel">
-    <div class="sub">Cada regra lê o texto da notificação (título e texto) com uma expressão regular. A de maior prioridade que casar decide. As regras que vieram com o app são um <b>chute</b>: ajuste com as notificações reais (Notificações → toque numa → Criar regra).</div>
-    <div class="row"><button type="button" class="btn primary small" data-ir="regra/nova">+ Nova regra</button></div>
+  const ordem = r.query.get('ordem') || 'app';
+  const origem = (r.query.get('origem') || '') as OrigemRegra | '';
+  const tipo = r.query.get('tipo') || 'notif';
+  const q = (o: Record<string, string>) => { const p = new URLSearchParams({ ordem, origem, tipo, ...o }); for (const [k, v] of [...p]) if (!v) p.delete(k); return p.toString() ? '?' + p : ''; };
+  const contagem = (o: OrigemRegra) => d.regras.filter(x => x.origem === o).length;
+  const linha = (x: RegraNotif) => `<button type="button" class="item${x.ativa ? '' : ' fora'}" data-ir="regra/${esc(x.id)}">
+      <div class="name">${esc(x.nome)}</div><div class="val"><span class="tag ${x.acao === 'ignorar' ? 'muted' : ''}">${ACOES[x.acao].replace(' (não vira transação)', '')}</span></div>
+      <div class="meta">${ordem === 'app' ? '' : `${esc(nomeApp(x.pacote))}, `}${ORIGENS_REGRA[x.origem].toLowerCase()}${x.criadaEm ? ` em ${fmtD(x.criadaEm.slice(0, 10))}` : ''}${x.ativa ? '' : ', desativada'}</div>
+      <div class="meta r">prioridade ${x.prioridade}</div></button>`;
+  let corpo: string;
+  if (tipo === 'cat') {
+    corpo = `<p class="sub">Criadas quando você corrige uma transação e marca “aplicar às parecidas”: tudo que contém o termo recebe o tipo e a categoria.</p>
+      <div class="folha"><div class="list">${d.regrasCat.map(x => `<div class="item"><div class="name">“${esc(x.termo)}”</div>
+      <div class="val"><button type="button" class="btn small danger" data-delcat="${esc(x.id)}">Excluir</button></div>
+      <div class="meta">${[x.tipo ? TIPOS[x.tipo] : '', x.cat || ''].filter(Boolean).join(', ')}</div><div class="meta r"></div></div>`).join('') || '<div class="empty">Nenhuma regra de categoria ainda.</div>'}</div></div>`;
+  } else {
+    const filtradas = d.regras.map((x, i) => ({ x, i })).filter(({ x }) => !origem || x.origem === origem);
+    if (ordem === 'app') {
+      const pacotes = [...new Set([...d.apps.map(a => a.pacote), ...d.regras.map(x => x.pacote)])];
+      corpo = pacotes.map(p => {
+        const rs = filtradas.filter(({ x }) => x.pacote === p).sort((a, b) => b.x.prioridade - a.x.prioridade || a.i - b.i).map(({ x }) => x);
+        return rs.length ? `<section class="panel"><h2>${esc(nomeApp(p))}</h2><div class="folha"><div class="list">${rs.map(linha).join('')}</div></div></section>` : '';
+      }).join('') || '<div class="empty">Nenhuma regra com este filtro.</div>';
+    } else {
+      // Ordem de criação: as que vieram com o app (sem data) contam como as mais antigas, na ordem da lista.
+      const chave = (o: { x: RegraNotif; i: number }) => (o.x.criadaEm || '') + String(o.i).padStart(5, '0');
+      const ord = filtradas.sort((a, b) => chave(a).localeCompare(chave(b)));
+      if (ordem === 'recentes') ord.reverse();
+      corpo = `<div class="folha"><div class="list">${ord.map(({ x }) => linha(x)).join('') || '<div class="empty">Nenhuma regra com este filtro.</div>'}</div></div>`;
+    }
+  }
+  el.innerHTML = `<section class="panel">
+    <p class="sub">Cada regra lê o título e o texto da notificação e decide o que ela vira. Vale a de maior prioridade que casar. As que vieram com o app foram conferidas só em parte com notificações reais.</p>
+    <div class="row"><button type="button" class="btn primary small" data-ir="regra/nova">Nova regra</button></div>
+  </section>
+  <div class="seg" role="group" aria-label="Tipo de regra">
+    <button type="button" data-q="${q({ tipo: 'notif' })}" aria-pressed="${tipo !== 'cat'}">De notificação (${d.regras.length})</button>
+    <button type="button" data-q="${q({ tipo: 'cat', origem: '' })}" aria-pressed="${tipo === 'cat'}">De categoria (${d.regrasCat.length})</button>
   </div>
-  ${pacotes.map(p => {
-    const rs = d.regras.filter(r => r.pacote === p).sort((a, b) => b.prioridade - a.prioridade);
-    return `<div class="panel"><h2>${esc(nomeApp(p))}</h2><div class="list">${rs.map(r => `<button type="button" class="item${r.ativa ? '' : ' fora'}" data-ir="regra/${esc(r.id)}">
-      <div class="name">${esc(r.nome)}</div><div class="val"><span class="tag">${r.prioridade}</span></div>
-      <div class="meta">${ACOES[r.acao]}${r.acao === 'ignorar' ? '' : ' · ' + esc(nomeConta(r.conta))}</div><div class="meta r">${r.ativa ? '' : 'desativada'}</div></button>`).join('') || '<div class="empty">Nenhuma regra para este app.</div>'}</div></div>`;
-  }).join('')}`;
+  ${tipo === 'cat' ? '' : `<div class="seg" role="group" aria-label="Ordenar">${ORDENS.map(([v, t]) => `<button type="button" data-q="${q({ ordem: v })}" aria-pressed="${v === ordem}">${t}</button>`).join('')}</div>
+  <div class="seg" role="group" aria-label="Origem"><button type="button" data-q="${q({ origem: '' })}" aria-pressed="${!origem}">Todas as origens</button>${(Object.keys(ORIGENS_REGRA) as OrigemRegra[]).map(o => `<button type="button" data-q="${q({ origem: o })}" aria-pressed="${o === origem}">${ORIGENS_REGRA[o]} (${contagem(o)})</button>`).join('')}</div>`}
+  ${corpo}`;
+  el.querySelectorAll<HTMLButtonElement>('[data-q]').forEach(b => (b.onclick = () => trocar('regras' + b.dataset.q)));
+  el.querySelectorAll<HTMLButtonElement>('[data-delcat]').forEach(b => (b.onclick = async () => {
+    await mudar(dd => ({ ...dd, regrasCat: dd.regrasCat.filter(x => x.id !== b.dataset.delcat) }));
+    dispatchEvent(new Event('rerender'));
+  }));
 }
 
 export function telaRegra(el: HTMLElement, id: string, r: Rota) {
@@ -32,13 +70,15 @@ export function telaRegra(el: HTMLElement, id: string, r: Rota) {
   const regra: RegraNotif = existente ? { ...existente } : {
     id: uid('rn'), nome: notif ? `${nomeApp(pac)}: ${notif.titulo}`.slice(0, 60) : '', pacote: pac,
     padrao: notif ? sugerirPadrao(notif.titulo, notif.texto) : '', descricao: '', acao: 'saida', sentido: 'sai', conta: contaPadrao, prioridade: 50, ativa: true,
+    origem: notif ? 'notificacao' : 'manual', criadaEm: new Date().toISOString(),
   };
   const pacotes = [...new Set([...d.apps.map(a => a.pacote), regra.pacote].filter(Boolean))];
   const ultima = notif || [...d.notifs].reverse().find(n => n.pacote === regra.pacote);
-  el.innerHTML = `<div class="panel">
+  el.innerHTML = `<section class="panel">
+    ${existente ? `<p class="sub">${ORIGENS_REGRA[regra.origem]}${regra.criadaEm ? `, em ${fmtD(regra.criadaEm.slice(0, 10))}` : ''}.</p>` : ''}
     <form id="fRegra" class="form" autocomplete="off">
       <div class="field full"><label for="rNome">Nome</label><input id="rNome" value="${esc(regra.nome)}" required></div>
-      <div class="field full"><label for="rApp">App</label><select id="rApp">${opcoes(pacotes.map(p => ({ v: p, t: `${nomeApp(p)} (${p})` })), regra.pacote)}</select></div>
+      <div class="field full"><label for="rApp">App</label><select id="rApp">${opcoes(pacotes.map(p => ({ v: p, t: nomeApp(p) })), regra.pacote)}</select></div>
       <div class="field full"><label for="rPadrao">Padrão (expressão regular, ignora maiúsculas)</label>
         <textarea id="rPadrao" class="mono" rows="5" spellcheck="false" autocapitalize="off" required>${esc(regra.padrao)}</textarea></div>
       <details class="como full"><summary>Como escrever o padrão</summary>
@@ -55,17 +95,17 @@ export function telaRegra(el: HTMLElement, id: string, r: Rota) {
       <label class="check full"><input type="checkbox" id="rAtiva"${regra.ativa ? ' checked' : ''}> Regra ativa</label>
 
       <div class="teste full">
-        <h3>Teste ao vivo</h3>
+        <h3>Teste com um texto</h3>
         <div class="field"><label for="tTit">Título</label><input id="tTit" value="${esc(ultima?.titulo || '')}"></div>
         <div class="field"><label for="tTxt">Texto</label><textarea id="tTxt" rows="3">${esc(ultima?.texto || '')}</textarea></div>
         <div id="resTeste" class="res-teste"></div>
         <div id="resRegistro" class="note"></div>
       </div>
 
-      <div class="row full"><button class="btn primary" type="submit">Salvar</button>
+      <div class="row full"><button class="btn primary" type="submit">Salvar regra</button>
         ${nova ? '' : '<button type="button" class="btn" id="btnDup">Duplicar</button><button type="button" class="btn danger" id="btnDel">Excluir</button>'}</div>
     </form>
-  </div>`;
+  </section>`;
 
   const v = (s: string) => ($(s) as HTMLInputElement).value;
   const ler = (): RegraNotif => ({

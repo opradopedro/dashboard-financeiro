@@ -1,5 +1,6 @@
 package app.dashboardfinanceiro.notificacoes
 
+import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
@@ -20,17 +21,28 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
+import com.getcapacitor.annotation.Permission
+import com.getcapacitor.annotation.PermissionCallback
+import org.json.JSONObject
 import java.lang.ref.WeakReference
 
 /**
  * Ponte entre o app (web) e o Android: estado do acesso a notificações, fila nativa, simulação,
  * atalhos para as telas de permissão, salvar arquivo (backup/exportação) e botão voltar.
  */
-@CapacitorPlugin(name = "Notificacoes")
+@CapacitorPlugin(
+    name = "Notificacoes",
+    permissions = [Permission(alias = "avisos", strings = [Manifest.permission.POST_NOTIFICATIONS])]
+)
 class NotificacoesPlugin : Plugin() {
+
+    /** Tela pedida ao tocar num aviso (o app navega para ela ao abrir). */
+    private var rotaPendente: String? = null
 
     override fun load() {
         instancia = WeakReference(this)
+        rotaPendente = activity.intent?.getStringExtra(Avisos.EXTRA_ROTA)
+        activity.intent?.removeExtra(Avisos.EXTRA_ROTA)
         // Botão voltar do Android: o app decide (fechar janela, voltar de tela ou sair).
         activity.runOnUiThread {
             activity.onBackPressedDispatcher.addCallback(activity, object : OnBackPressedCallback(true) {
@@ -48,6 +60,20 @@ class NotificacoesPlugin : Plugin() {
         notifyListeners("retomou", JSObject())
     }
 
+    override fun handleOnNewIntent(intent: Intent) {
+        super.handleOnNewIntent(intent)
+        val rota = intent.getStringExtra(Avisos.EXTRA_ROTA) ?: return
+        intent.removeExtra(Avisos.EXTRA_ROTA)
+        notifyListeners("abrir", JSObject().apply { put("rota", rota) })
+    }
+
+    @PluginMethod
+    fun rotaInicial(call: PluginCall) {
+        val r = rotaPendente
+        rotaPendente = null
+        call.resolve(JSObject().apply { put("rota", r ?: "") })
+    }
+
     private fun fila() = Fila.de(context)
 
     @PluginMethod
@@ -61,7 +87,59 @@ class NotificacoesPlugin : Plugin() {
             put("fabricante", Build.MANUFACTURER ?: "")
             put("pendentes", fila().pendentes())
             put("pacotes", JSArray(fila().pacotes().sorted()))
+            put("avisosPermitidos", NotificationManagerCompat.from(context).areNotificationsEnabled())
         })
+    }
+
+    /** Regras ativas (em ordem de prioridade), nomes dos apps e modo dos avisos, para decidir o aviso com o app fechado. */
+    @PluginMethod
+    fun definirRegras(call: PluginCall) {
+        val regras = call.getArray("regras") ?: return call.reject("Faltou a lista de regras.")
+        fila().definirRegras(regras, call.getObject("nomes") ?: JSONObject(), call.getString("modo") ?: "sem-regra")
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun lerDecisoes(call: PluginCall) {
+        val itens = JSArray()
+        for (d in fila().listarDecisoes()) itens.put(JSObject().apply { put("id", d.id); put("chave", d.chave); put("acao", d.acao); put("em", d.em) })
+        call.resolve(JSObject().apply { put("itens", itens) })
+    }
+
+    @PluginMethod
+    fun confirmarDecisoes(call: PluginCall) {
+        val arr = call.getArray("ids") ?: return call.reject("Faltou a lista de ids.")
+        fila().confirmarDecisoes((0 until arr.length()).map { arr.getLong(it) })
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun cancelarAvisos(call: PluginCall) {
+        val arr = call.getArray("chaves") ?: return call.reject("Faltou a lista de chaves.")
+        for (i in 0 until arr.length()) Avisos.cancelar(context, arr.getString(i))
+        call.resolve()
+    }
+
+    /** Android 13+: pede a permissão de mostrar notificações. Antes disso, já vem liberada. */
+    @PluginMethod
+    fun pedirPermissaoAvisos(call: PluginCall) {
+        if (Build.VERSION.SDK_INT < 33 || NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            return call.resolve(JSObject().apply { put("permitido", NotificationManagerCompat.from(context).areNotificationsEnabled()) })
+        }
+        requestPermissionForAlias("avisos", call, "aoPermitirAvisos")
+    }
+
+    @PermissionCallback
+    private fun aoPermitirAvisos(call: PluginCall) {
+        call.resolve(JSObject().apply { put("permitido", NotificationManagerCompat.from(context).areNotificationsEnabled()) })
+    }
+
+    @PluginMethod
+    fun abrirConfigAvisos(call: PluginCall) {
+        val i = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        else Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))
+        abrir(call, i, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName)))
     }
 
     @PluginMethod
@@ -94,9 +172,14 @@ class NotificacoesPlugin : Plugin() {
     @PluginMethod
     fun simular(call: PluginCall) {
         val pacote = call.getString("pacote")?.trim().orEmpty()
-        val aceita = fila().registrar(pacote, call.getString("titulo").orEmpty(), call.getString("texto").orEmpty(), System.currentTimeMillis(), null)
-        if (aceita) avisarNova()
-        call.resolve(JSObject().apply { put("aceita", aceita) })
+        val titulo = call.getString("titulo").orEmpty()
+        val texto = call.getString("texto").orEmpty()
+        val chave = fila().registrar(pacote, titulo, texto, System.currentTimeMillis(), null)
+        if (chave != null) {
+            avisarNova()
+            Avisos.talvezAvisar(context, chave, pacote, titulo, texto)
+        }
+        call.resolve(JSObject().apply { put("aceita", chave != null); put("chave", chave ?: "") })
     }
 
     @PluginMethod

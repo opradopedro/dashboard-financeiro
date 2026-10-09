@@ -1,7 +1,7 @@
 // Backup e restauração por arquivo: tudo do app num JSON. Também usado para validar o que vem do
 // banco local (dados de versões antigas ganham os campos novos com os valores iniciais).
 import type { Dados } from './tipos';
-import { dadosIniciais } from './padroes';
+import { dadosIniciais, REGRAS_INICIAIS } from './padroes';
 import { TIPOS } from './tipos';
 
 export const APP_BACKUP = 'dashboard-financeiro';
@@ -45,12 +45,16 @@ export function sanear(x: unknown): Dados {
         ...(typeof n.regra === 'string' ? { regra: n.regra } : {}), ...(typeof n.tx === 'string' ? { tx: n.tx } : {}),
         ...(typeof n.erro === 'string' ? { erro: n.erro } : {}), ...(n.simulada ? { simulada: true } : {}) })),
     apps: tem('apps') ? arr(o.apps).filter(a => typeof a.pacote === 'string' && a.pacote)
-      .map(a => ({ pacote: str(a.pacote).trim(), nome: str(a.nome, str(a.pacote)), ativo: a.ativo !== false })) : ini.apps,
+      .map(a => ({ pacote: str(a.pacote).trim(), nome: str(a.nome, str(a.pacote)), ativo: a.ativo !== false,
+        ...(typeof a.conta === 'string' && a.conta ? { conta: a.conta } : {}) })) : ini.apps,
     regras: tem('regras') ? arr(o.regras).filter(r => typeof r.id === 'string' && typeof r.padrao === 'string')
       .map(r => ({ id: str(r.id), nome: str(r.nome, 'Regra'), pacote: str(r.pacote), padrao: str(r.padrao), descricao: str(r.descricao),
         acao: (tipoOk(r.acao) || r.acao === 'ignorar' ? r.acao : 'saida') as Dados['regras'][0]['acao'],
         sentido: r.sentido === 'entra' ? 'entra' as const : 'sai' as const, conta: str(r.conta),
-        prioridade: Number.isFinite(num(r.prioridade)) ? num(r.prioridade) : 0, ativa: r.ativa !== false })) : ini.regras,
+        prioridade: Number.isFinite(num(r.prioridade)) ? num(r.prioridade) : 0, ativa: r.ativa !== false,
+        origem: (['padrao', 'manual', 'notificacao', 'automatica'].includes(str(r.origem)) ? r.origem
+          : REGRAS_INICIAIS.some(x => x.id === r.id) ? 'padrao' : 'manual') as Dados['regras'][0]['origem'],
+        criadaEm: str(r.criadaEm) })) : ini.regras,
     categorias: tem('categorias') ? arr(o.categorias).filter(c => typeof c.nome === 'string' && c.nome)
       .map(c => ({ nome: str(c.nome), receita: !!c.receita, palavras: Array.isArray(c.palavras) ? c.palavras.filter((p): p is string => typeof p === 'string') : [] })) : ini.categorias,
     regrasCat: arr(o.regrasCat).filter(r => typeof r.id === 'string' && typeof r.termo === 'string' && r.termo)
@@ -59,7 +63,7 @@ export function sanear(x: unknown): Dados {
       .map(m => {
         const n = (k: string) => (Number.isInteger(m[k]) ? m[k] as number : -1);
         return { id: str(m.id), conta: str(m.conta), nome: str(m.nome, 'Modelo'), assinatura: str(m.assinatura), linhaCab: n('linhaCab'), colData: n('colData'),
-          colDesc: n('colDesc'), colDesc2: n('colDesc2'), colValor: n('colValor'), colCredito: n('colCredito'), colDebito: n('colDebito'), inverter: !!m.inverter,
+          colDesc: n('colDesc'), colDesc2: n('colDesc2'), colValor: n('colValor'), colCredito: n('colCredito'), colDebito: n('colDebito'), colSaldo: n('colSaldo'), inverter: !!m.inverter,
           formatoData: (['auto', 'dmy', 'ymd', 'mdy'].includes(str(m.formatoData)) ? m.formatoData : 'auto') as 'auto' };
       }),
     revisoes: arr(o.revisoes).filter(r => typeof r.id === 'string' && r.linha && typeof r.linha === 'object' && Array.isArray(r.candidatos))
@@ -72,7 +76,16 @@ export function sanear(x: unknown): Dados {
       .map(i => ({ id: str(i.id), arquivo: str(i.arquivo), conta: str(i.conta), em: str(i.em), de: str(i.de), ate: str(i.ate),
         novas: Number(i.novas) || 0, unidas: Number(i.unidas) || 0, revisao: Number(i.revisao) || 0, repetidas: Number(i.repetidas) || 0 })),
     excluidas: Array.isArray(o.excluidas) ? o.excluidas.filter((k): k is string => typeof k === 'string') : [],
-    config: { boasVindasVista: !!(o.config as Obj | undefined)?.boasVindasVista },
+    config: (() => {
+      const c = (o.config || {}) as Obj;
+      return {
+        boasVindasVista: !!c.boasVindasVista,
+        titular: str(c.titular).slice(0, 120),
+        avisos: (['sem-regra', 'todas', 'nunca'].includes(str(c.avisos)) ? c.avisos : 'sem-regra') as Dados['config']['avisos'],
+        // Dados antigos (sem versão) são da versão 1; migracoes.ts leva até a atual.
+        versaoDados: Number.isInteger(c.versaoDados) ? c.versaoDados as number : 1,
+      };
+    })(),
   };
   return d;
 }

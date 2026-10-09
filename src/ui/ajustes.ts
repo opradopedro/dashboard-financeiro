@@ -4,7 +4,7 @@ import { atualizarEstado, enviarPacotes, mudar, state } from '../app';
 import { lerBackup, montarBackup } from '../core/backup';
 import { exportarFinai } from '../core/finai';
 import { dadosIniciais } from '../core/padroes';
-import { TIPOS, type Conta, type TipoConta } from '../core/tipos';
+import { MODOS_AVISOS, type Conta, type ModoAvisos, type TipoConta } from '../core/tipos';
 import { arred, hoje, parseValor, slug } from '../core/util';
 import { nativo, type EstadoNativo } from '../nativo/notificacoes';
 import { $, esc, opcoes, toast } from './fmt';
@@ -13,39 +13,78 @@ import { aba, voltar } from './nav';
 const ok = (b: boolean, sim: string, nao: string) => `<span class="${b ? 'ok' : 'err'}">${b ? '✓ ' + sim : '✗ ' + nao}</span>`;
 
 function painelServico(n: EstadoNativo | null) {
-  if (!n || n.web) return `<div class="panel"><h2>Captura de notificações</h2><div class="sub">Rodando no navegador: a captura só funciona no app instalado no Android. O simulador funciona aqui também.</div></div>`;
-  return `<div class="panel">
+  if (!n || n.web) return `<section class="caixa"><h2>Captura de notificações</h2><p class="sub">Rodando no navegador: a captura só funciona no app instalado no Android. O simulador funciona aqui também.</p></section>`;
+  return `<section class="caixa">
     <h2>Captura de notificações</h2>
     <div class="status-lista">
       <div>${ok(n.acessoPermitido, 'Acesso a notificações liberado', 'Acesso a notificações desligado')}</div>
       <div>${n.acessoPermitido ? ok(n.servicoConectado, 'Serviço ativo', 'Serviço parado (toque em Religar)') : ''}</div>
       <div>${ok(n.bateriaLiberada, 'Sem restrição de bateria', 'Bateria restringindo o app')}</div>
-      <div class="sub">${n.pendentes} na fila nativa · monitorando ${n.pacotes.length} ${n.pacotes.length === 1 ? 'app' : 'apps'}</div>
+      <div>${ok(n.avisosPermitidos, 'Avisos do app liberados', 'Avisos do app bloqueados (sem Ignorar/Adicionar)')}</div>
+      <div class="sub">Monitorando ${n.pacotes.length === 1 ? '1 app' : `${n.pacotes.length} apps`}${n.pendentes ? `, ${n.pendentes} esperando na fila` : ''}.</div>
     </div>
     <div class="row">
       ${n.acessoPermitido ? '' : '<button type="button" class="btn primary small" data-ir="boasvindas">Liberar acesso</button>'}
       ${n.bateriaLiberada ? '' : '<button type="button" class="btn small" id="btnBat">Liberar bateria</button>'}
+      ${n.avisosPermitidos ? '' : '<button type="button" class="btn small" id="btnAvisos">Liberar avisos</button>'}
       ${n.acessoPermitido && !n.servicoConectado ? '<button type="button" class="btn small" id="btnReligar">Religar</button>' : ''}
-      <button type="button" class="btn small" id="btnAtualizar">Atualizar</button>
+      <button type="button" class="btn small" id="btnAtualizar">Verificar de novo</button>
     </div>
-  </div>`;
+  </section>`;
+}
+
+function painelAvisos() {
+  const c = state.dados.config;
+  return `<section class="caixa">
+    <h2>Avisos</h2>
+    <p class="sub">Quando chega uma notificação de app monitorado, o app pode avisar com os botões Ignorar e Adicionar, sem precisar abri-lo. Adicionar cria a regra e a transação; Ignorar silencia as próximas com o mesmo título.</p>
+    <div class="field"><label for="modoAvisos">Avisar</label><select id="modoAvisos">${opcoes((Object.keys(MODOS_AVISOS) as ModoAvisos[]).map(m => ({ v: m, t: MODOS_AVISOS[m] })), c.avisos)}</select></div>
+  </section>
+  <section class="caixa">
+    <h2>Seu nome</h2>
+    <p class="sub">Como aparece nos bancos. Pix de você para você mesmo (de outra conta sua) passa a contar como transferência interna, não como entrada.</p>
+    <form id="fTitular" class="form" autocomplete="off"><div class="field full"><label for="titular">Nome completo</label><input id="titular" value="${esc(c.titular)}" autocapitalize="words"></div>
+      <div class="row full"><button class="btn small" type="submit">Salvar nome</button></div></form>
+  </section>`;
 }
 
 export function telaAjustes(el: HTMLElement) {
   const d = state.dados;
   el.innerHTML = `${painelServico(state.nativo)}
-  <div class="panel"><div class="list">
-    ${[['apps', 'Apps monitorados', `${d.apps.filter(a => a.ativo).length} ativos`], ['regras', 'Regras de notificação', `${d.regras.length} regras`],
+  <div class="folha"><div class="list">
+    ${[['apps', 'Apps monitorados', `${d.apps.filter(a => a.ativo).length} ativos`], ['regras', 'Regras', `${d.regras.length} de notificação, ${d.regrasCat.length} de categoria`],
        ['contas', 'Contas', `${d.contas.length} contas`], ['categorias', 'Categorias e palavras-chave', `${d.categorias.length} categorias`],
-       ['regrascat', 'Regras de categoria', `${d.regrasCat.length} regras`], ['dados', 'Backup, restauração e exportação', 'finai-banco/1'],
-       ['boasvindas', 'Guia de permissões', 'acesso a notificações e bateria']]
-      .map(([r, t, s]) => `<button type="button" class="item" data-ir="${r}"><div class="name">${t}</div><div class="val">›</div><div class="meta">${s}</div><div class="meta r"></div></button>`).join('')}
+       ['dados', 'Backup, restauração e exportação', 'Arquivo do app e finai-banco/1'],
+       ['boasvindas', 'Guia de permissões', 'Notificações, avisos e bateria']]
+      .map(([r, t, s]) => `<button type="button" class="item" data-ir="${r}"><div class="name">${t}</div><div class="val"></div><div class="meta">${s}</div><div class="meta r"></div></button>`).join('')}
   </div></div>
-  <div class="panel"><div class="note">Dashboard Financeiro ${esc(__VERSAO__)}<br>Seus dados ficam só neste aparelho. O app não usa a internet (nem tem permissão para isso).</div></div>`;
+  ${painelAvisos()}
+  <p class="note">Dashboard Financeiro ${esc(__VERSAO__)}. Seus dados ficam só neste aparelho; o app não usa a internet nem tem permissão para isso.</p>`;
   ligarServico();
+  $('#modoAvisos').onchange = async () => {
+    const avisos = ($('#modoAvisos') as HTMLSelectElement).value as ModoAvisos;
+    await mudar(dd => ({ ...dd, config: { ...dd.config, avisos } }));
+    toast('Avisos: ' + MODOS_AVISOS[avisos].toLowerCase() + '.');
+  };
+  $('#fTitular').onsubmit = async e => {
+    e.preventDefault();
+    const titular = ($('#titular') as HTMLInputElement).value.trim();
+    await mudar(dd => ({ ...dd, config: { ...dd.config, titular } }));
+    toast(titular ? 'Nome salvo.' : 'Nome apagado.');
+  };
+}
+
+async function liberarAvisos() {
+  try {
+    const { permitido } = await nativo.pedirPermissaoAvisos();
+    if (!permitido) await nativo.abrirConfigAvisos();
+  } catch (e) { toast((e as Error).message); }
+  await atualizarEstado();
+  dispatchEvent(new Event('rerender'));
 }
 
 function ligarServico() {
+  $('#btnAvisos')?.addEventListener('click', liberarAvisos);
   $('#btnBat')?.addEventListener('click', () => nativo.pedirBateria().catch(e => toast((e as Error).message)));
   $('#btnReligar')?.addEventListener('click', async () => { await nativo.religar(); setTimeout(async () => { await atualizarEstado(); dispatchEvent(new Event('rerender')); }, 1500); });
   $('#btnAtualizar')?.addEventListener('click', async () => { await atualizarEstado(); dispatchEvent(new Event('rerender')); });
@@ -56,11 +95,11 @@ function ligarServico() {
 export function telaBoasVindas(el: HTMLElement) {
   const n = state.nativo;
   const restrito = !n || n.android >= 33 || n.web;
-  el.innerHTML = `<div class="panel hero-bv">
-    <h2>Bem-vindo 👋</h2>
-    <div class="sub">Este app lê as notificações dos seus apps de banco (Mercado Pago, Nubank, Rico e outros que você escolher) e transforma em transações. Tudo fica só no aparelho; o app nem tem acesso à internet.</div>
-  </div>
-  <div class="panel">
+  el.innerHTML = `<section class="fita">
+    <div class="fita-mes"><h2>olá</h2></div>
+    <p class="frase">Este app lê as notificações dos seus apps de banco e transforma em transações. Tudo fica só no aparelho; ele nem tem acesso à internet.</p>
+  </section>
+  <section class="caixa">
     <h2>1. Acesso a notificações</h2>
     <div>${n?.web ? '<span class="sub">No navegador não há o que liberar.</span>' : ok(!!n?.acessoPermitido, 'Liberado', 'Ainda não liberado')}</div>
     <ol class="passos">
@@ -74,18 +113,25 @@ export function telaBoasVindas(el: HTMLElement) {
     </ol>
     <div class="row"><button type="button" class="btn primary" id="bvAcesso">Abrir configuração</button>
       ${restrito ? '<button type="button" class="btn" id="bvInfo">Abrir informações do app</button>' : ''}</div>
-  </div>
-  <div class="panel">
-    <h2>2. Bateria</h2>
+  </section>
+  <section class="caixa">
+    <h2>2. Avisos do app</h2>
+    <div>${n?.web ? '' : ok(!!n?.avisosPermitidos, 'Liberados', 'Ainda não liberados')}</div>
+    <p class="sub">Para o app perguntar, com os botões Ignorar e Adicionar, o que fazer com cada notificação que ainda não tem regra.</p>
+    <div class="row"><button type="button" class="btn primary" id="bvAvisos">Permitir avisos</button></div>
+  </section>
+  <section class="caixa">
+    <h2>3. Bateria</h2>
     <div>${n?.web ? '' : ok(!!n?.bateriaLiberada, 'Sem restrição', 'O Android pode parar o serviço para economizar bateria')}</div>
     <div class="sub">Toque em <b>Liberar bateria</b> e escolha <b>Permitir</b>. Em alguns aparelhos (Xiaomi, Samsung, Motorola) também vale abrir as informações do app → Bateria → <b>Sem restrições</b>, e manter o app “travado” na tela de recentes.</div>
     <div class="row"><button type="button" class="btn primary" id="bvBat">Liberar bateria</button></div>
-  </div>
-  <div class="panel">
-    <h2>3. Pronto</h2>
+  </section>
+  <section class="caixa">
+    <h2>4. Pronto</h2>
     <div class="sub">A partir daqui, toda notificação dos apps monitorados é guardada mesmo com o app fechado, e entra quando você abrir. Teste com <b>Notificações → Simular notificação</b>. As regras que vieram com o app são um chute: ajuste com as notificações reais.</div>
     <div class="row"><button type="button" class="btn primary" id="bvFim">Começar</button><button type="button" class="btn" id="bvAtualizar">Verificar de novo</button></div>
-  </div>`;
+  </section>`;
+  $('#bvAvisos').onclick = liberarAvisos;
   $('#bvAcesso').onclick = () => nativo.abrirAcessoNotificacoes().catch(e => toast((e as Error).message));
   $('#bvInfo')?.addEventListener('click', () => nativo.abrirInfoApp().catch(e => toast((e as Error).message)));
   $('#bvBat').onclick = () => nativo.pedirBateria().catch(e => toast((e as Error).message));
@@ -226,19 +272,6 @@ export function telaCategorias(el: HTMLElement) {
   };
 }
 
-export function telaRegrasCat(el: HTMLElement) {
-  const d = state.dados;
-  el.innerHTML = `<div class="panel">
-    <div class="sub">Criadas quando você corrige uma transação e marca “aplicar às parecidas”: tudo que contém o termo na descrição recebe o tipo e a categoria. Valem antes das palavras-chave.</div>
-    <div class="list">${d.regrasCat.map(r => `<div class="item"><div class="name">“${esc(r.termo)}”</div>
-      <div class="val"><button type="button" class="btn small danger" data-del="${esc(r.id)}">Excluir</button></div>
-      <div class="meta">${[r.tipo ? TIPOS[r.tipo] : '', r.cat || ''].filter(Boolean).join(' · ')}</div><div class="meta r"></div></div>`).join('') || '<div class="empty">Nenhuma regra ainda.</div>'}</div></div>`;
-  el.querySelectorAll<HTMLButtonElement>('[data-del]').forEach(b => (b.onclick = async () => {
-    await mudar(dd => ({ ...dd, regrasCat: dd.regrasCat.filter(r => r.id !== b.dataset.del) }));
-    dispatchEvent(new Event('rerender'));
-  }));
-}
-
 // ---------- Dados ----------
 
 const dataArq = () => hoje();
@@ -297,7 +330,7 @@ export function telaDados(el: HTMLElement) {
   $('#btnApagar').onclick = async () => {
     if (!confirm('Apagar TODOS os dados deste aparelho? Não dá para desfazer.')) return;
     if (prompt('Para confirmar, digite APAGAR') !== 'APAGAR') return;
-    await mudar(() => ({ ...dadosIniciais(), config: { boasVindasVista: true } }));
+    await mudar(() => { const ini = dadosIniciais(); return { ...ini, config: { ...ini.config, boasVindasVista: true } }; });
     await enviarPacotes();
     toast('Dados apagados.');
     aba('');

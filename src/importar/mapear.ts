@@ -6,7 +6,9 @@ import { norm, parseData, parseValor } from '../core/util';
 import type { Celula } from './planilha';
 
 const RE_DATA = / (data|dt|date|dia) /;
-const RE_DESC = / (descricao|historico|lancamento|estabelecimento|description|memo|detalhe|detalhes|titulo|identificacao|nome) /;
+const RE_DESC = / (descricao|historico|lancamento|estabelecimento|description|title|memo|detalhe|detalhes|titulo|identificacao|nome|movimentacao|movimento) /;
+const RE_SALDO = / (saldo|balance) /;
+const RE_PARCELA = / (parcela|parcelas|installment) /;
 const RE_VALOR = / (valor|value|amount|quantia|montante|valor r|valor rs|total) /;
 const RE_CRED = / (credito|creditos|entrada|entradas|credit) /;
 const RE_DEB = / (debito|debitos|saida|saidas|debit) /;
@@ -29,14 +31,17 @@ export function acharCabecalho(rows: Celula[][]): number {
 /** Sugestão de mapeamento: pelo nome das colunas e, sem cabeçalho, pelo conteúdo. */
 export function sugerirMapeamento(rows: Celula[][]): Mapeamento {
   const linhaCab = acharCabecalho(rows);
-  const m: Mapeamento = { linhaCab, colData: -1, colDesc: -1, colDesc2: -1, colValor: -1, colCredito: -1, colDebito: -1, inverter: false, formatoData: 'auto' };
+  const m: Mapeamento = { linhaCab, colData: -1, colDesc: -1, colDesc2: -1, colValor: -1, colCredito: -1, colDebito: -1, colSaldo: -1, inverter: false, formatoData: 'auto' };
   if (linhaCab >= 0) {
     const ns = rows[linhaCab].map(c => norm(txt(c)));
     const acha = (re: RegExp, fora: number[] = []) => ns.findIndex((n, i) => re.test(n) && !fora.includes(i));
     m.colData = acha(RE_DATA);
-    m.colValor = acha(RE_VALOR, [m.colData]);
+    m.colSaldo = acha(RE_SALDO);
+    m.colValor = acha(RE_VALOR, [m.colData, m.colSaldo]);
     m.colDesc = acha(RE_DESC, [m.colData, m.colValor]);
     if (m.colValor < 0) { m.colCredito = acha(RE_CRED, [m.colData]); m.colDebito = acha(RE_DEB, [m.colData]); }
+    // Parcela vai junto da descrição: a mesma compra parcelada aparece em várias faturas.
+    m.colDesc2 = acha(RE_PARCELA, [m.colData, m.colDesc, m.colValor]);
   }
   // Pelo conteúdo: coluna com mais datas, coluna com mais valores, coluna de texto mais longo.
   const dados = rows.slice(linhaCab + 1, linhaCab + 30);
@@ -46,11 +51,12 @@ export function sugerirMapeamento(rows: Celula[][]): Mapeamento {
   if (m.colValor < 0 && m.colCredito < 0 && m.colDebito < 0) {
     const n = conta(c => txt(c) !== '' && Number.isFinite(parseValor(c)) && !parseData(c));
     n[m.colData] = -1;
+    if (m.colSaldo >= 0) n[m.colSaldo] = -1;
     m.colValor = n.indexOf(Math.max(...n));
   }
   if (m.colDesc < 0) {
     const tam = Array.from({ length: ncol }, (_, i) => dados.reduce((s, r) => s + (Number.isFinite(parseValor(r[i])) ? 0 : txt(r[i]).length), 0));
-    for (const i of [m.colData, m.colValor, m.colCredito, m.colDebito]) if (i >= 0) tam[i] = -1;
+    for (const i of [m.colData, m.colValor, m.colCredito, m.colDebito, m.colSaldo]) if (i >= 0) tam[i] = -1;
     m.colDesc = tam.indexOf(Math.max(...tam));
   }
   return m;
@@ -76,11 +82,14 @@ export function aplicarMapeamento(rows: Celula[][], m: Mapeamento): Convertido {
       const d = m.colDebito >= 0 && txt(r[m.colDebito]) !== '' ? Math.abs(parseValor(r[m.colDebito])) : 0;
       valor = Number.isFinite(c) && Number.isFinite(d) && (c || d) ? c - d : NaN;
     }
-    const desc = [txt(r[m.colDesc]), m.colDesc2 >= 0 ? txt(r[m.colDesc2]) : ''].filter(Boolean).join(' · ').trim();
+    // Complemento vazio ou sem informação ("-", "de 1") não entra.
+    const comp = m.colDesc2 >= 0 ? txt(r[m.colDesc2]).trim() : '';
+    const desc = [txt(r[m.colDesc]).trim(), /^(-+|de\s+\d+|0)?$/i.test(comp) ? '' : comp].filter(Boolean).join(' - ');
     if (!data) { if (r.some(c => txt(c) !== '')) out.ignoradas.push({ linha: i + 1, motivo: 'sem data' }); return; }
     if (!Number.isFinite(valor) || valor === 0) { out.ignoradas.push({ linha: i + 1, motivo: 'sem valor' }); return; }
     if (/^(saldo|total|saldo anterior|saldo do dia|saldo final)\b/i.test(norm(desc).trim())) { out.ignoradas.push({ linha: i + 1, motivo: 'linha de saldo/total' }); return; }
-    out.linhas.push({ data, desc, valor: m.inverter ? -valor : valor });
+    const saldo = m.colSaldo >= 0 && txt(r[m.colSaldo]) !== '' ? parseValor(r[m.colSaldo]) : NaN;
+    out.linhas.push({ data, desc, valor: m.inverter ? -valor : valor, ...(Number.isFinite(saldo) ? { saldo } : {}) });
   });
   return out;
 }

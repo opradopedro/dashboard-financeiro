@@ -5,23 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=auto">
   <!-- Nenhuma conexão externa: só arquivos do próprio app. -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
-  <meta name="theme-color" content="#0F1220">
+  <meta name="theme-color" content="#0E1420">
+  <link rel="icon" href="data:,">
   <meta name="color-scheme" content="dark">
   <title>Dashboard Financeiro</title>
 </head>
 <body>
   <header class="top">
-    <button type="button" class="btn icon back" id="btnVoltar" aria-label="Voltar" hidden>‹</button>
+    <button type="button" class="back" id="btnVoltar" aria-label="Voltar" hidden></button>
     <h1 id="title">Painel</h1>
   </header>
   <main class="wrap" id="view"></main>
   <div id="carregando" class="carregando">Carregando…</div>
   <nav aria-label="Navegação principal"><div>
-    <button type="button" data-aba="">Painel</button>
-    <button type="button" data-aba="transacoes">Transações</button>
-    <button type="button" data-aba="notificacoes">Notificações</button>
-    <button type="button" data-aba="importar">Importar</button>
-    <button type="button" data-aba="ajustes">Ajustes</button>
+    <button type="button" data-aba="" data-icone="painel">Painel</button>
+    <button type="button" data-aba="transacoes" data-icone="transacoes">Transações</button>
+    <button type="button" data-aba="notificacoes" data-icone="notificacoes">Notificações</button>
+    <button type="button" data-aba="importar" data-icone="importar">Importar</button>
+    <button type="button" data-aba="ajustes" data-icone="ajustes">Ajustes</button>
   </div></nav>
   <div id="toast" role="status" hidden></div>
   <script type="module" src="/src/main.ts"></script>

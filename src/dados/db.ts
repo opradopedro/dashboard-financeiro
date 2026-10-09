@@ -3,6 +3,7 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import type { Dados } from '../core/tipos';
 import { sanear } from '../core/backup';
+import { migrar } from '../core/migracoes';
 
 let dbp: Promise<IDBPDatabase> | null = null;
 const db = () => (dbp ||= openDB('dashboard-financeiro', 1, { upgrade(d) { d.createObjectStore('kv'); } }));
@@ -10,7 +11,11 @@ const db = () => (dbp ||= openDB('dashboard-financeiro', 1, { upgrade(d) { d.cre
 export async function carregar(): Promise<Dados> {
   // Pede ao navegador para não apagar os dados quando faltar espaço.
   try { await navigator.storage?.persist?.(); } catch { /* sem suporte */ }
-  return sanear(await (await db()).get('kv', 'dados'));
+  const bruto = await (await db()).get('kv', 'dados');
+  if (!bruto) return sanear(undefined);
+  const { dados, migrou } = migrar(sanear(bruto));
+  if (migrou) await gravar(dados);
+  return dados;
 }
 
 export async function gravar(d: Dados): Promise<void> {

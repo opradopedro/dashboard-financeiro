@@ -2,6 +2,8 @@
 import type { Dados, Transacao } from './core/tipos';
 import { classificar, type Classificada } from './core/classificar';
 import { receber, reprocessar } from './core/ingestao';
+import { regrasDoApp } from './core/regras';
+import { aplicarDecisoes, type Decisao, type ResultadoDecisao } from './core/automatica';
 import { chavesParaExcluidas } from './core/juntar';
 import { carregar, gravar } from './dados/db';
 import { nativo, type EstadoNativo } from './nativo/notificacoes';
@@ -17,7 +19,7 @@ let cache: { v: number; cls: Classificada[] } | null = null;
 export function classificadas(): Classificada[] {
   if (cache?.v !== state.versao) {
     const d = state.dados;
-    cache = { v: state.versao, cls: classificar(d.txs, { contas: d.contas, categorias: d.categorias, regrasCat: d.regrasCat }) };
+    cache = { v: state.versao, cls: classificar(d.txs, { contas: d.contas, categorias: d.categorias, regrasCat: d.regrasCat, titular: d.config.titular }) };
   }
   return cache.cls;
 }
@@ -56,6 +58,36 @@ export async function enviarPacotes() {
   await nativo.definirPacotes({ pacotes: state.dados.apps.filter(a => a.ativo).map(a => a.pacote) });
 }
 
+let ultimoEnvio = '';
+/**
+ * Mantém o Android em dia: pacotes monitorados, regras ativas (para decidir o aviso com o app
+ * fechado), nomes dos apps e modo dos avisos. Só envia quando algo mudou.
+ */
+export async function sincronizarNativo() {
+  const d = state.dados;
+  const regras = d.apps.flatMap(a => regrasDoApp(d.regras, a.pacote)).map(r => ({ pacote: r.pacote, padrao: r.padrao, acao: r.acao }));
+  const nomes = Object.fromEntries(d.apps.map(a => [a.pacote, a.nome]));
+  const pacotes = d.apps.filter(a => a.ativo).map(a => a.pacote);
+  const chave = JSON.stringify([regras, nomes, pacotes, d.config.avisos]);
+  if (chave === ultimoEnvio) return;
+  await nativo.definirPacotes({ pacotes });
+  await nativo.definirRegras({ regras, nomes, modo: d.config.avisos });
+  ultimoEnvio = chave;
+}
+
+/** Tira da barra os avisos de notificações que já foram resolvidas. */
+export function cancelarAvisos(chaves: string[]) {
+  if (chaves.length) void nativo.cancelarAvisos({ chaves }).catch(() => undefined);
+}
+
+/** Aplica decisões (botões Adicionar/Ignorar) e devolve o que aconteceu com cada uma. */
+export async function decidir(decisoes: Decisao[]): Promise<ResultadoDecisao[]> {
+  let res: ResultadoDecisao[] = [];
+  await mudar(d => { const r = aplicarDecisoes(d, decisoes); res = r.resultados; return r.dados; });
+  cancelarAvisos(decisoes.map(x => x.chave));
+  return res;
+}
+
 export async function atualizarEstado() {
   try { state.nativo = await nativo.estado(); } catch { state.nativo = null; }
   return state.nativo;
@@ -71,16 +103,26 @@ export function consumirFila(): Promise<number> {
   return (consumindo ||= (async () => {
     try {
       const { itens } = await nativo.lerFila();
-      if (!itens.length) return 0;
       let novas = 0;
-      await mudar(d => { const r = receber(d, itens); novas = r.novas.length; return r.dados; });
-      await nativo.confirmar({ ids: itens.map(i => i.id) });
+      if (itens.length) {
+        await mudar(d => { const r = receber(d, itens); novas = r.novas.length; return r.dados; });
+        await nativo.confirmar({ ids: itens.map(i => i.id) });
+      }
+      // Botões tocados nos avisos com o app fechado (depois da fila: a notificação já está registrada).
+      const { itens: decs } = await nativo.lerDecisoes();
+      if (decs.length) {
+        await mudar(d => aplicarDecisoes(d, decs.map(x => ({ chave: x.chave, acao: x.acao }))).dados);
+        await nativo.confirmarDecisoes({ ids: decs.map(x => x.id) });
+      }
       return novas;
     } finally { consumindo = null; }
   })());
 }
 
-export const reprocessarNotifs = (ids: string[]) => mudar(d => reprocessar(d, ids));
+export async function reprocessarNotifs(ids: string[]) {
+  await mudar(d => reprocessar(d, ids));
+  cancelarAvisos(state.dados.notifs.filter(n => ids.includes(n.id) && n.status !== 'sem-regra' && n.status !== 'erro').map(n => n.id));
+}
 
 export function excluirTx(id: string) {
   return mudar(d => {

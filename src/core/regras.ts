@@ -53,7 +53,11 @@ export function aplicarRegra(r: RegraNotif, n: NotifEntrada): Exclude<Resultado,
   const v = parseValor(grupos.valor);
   if (!Number.isFinite(v) || v === 0) return { status: 'erro', regra: r, erro: `Não consegui ler o valor "${grupos.valor}".` };
   let desc = '';
-  if (r.descricao?.trim()) desc = limpa(r.descricao.replace(/\{(\w+)\}/g, (_, k) => grupos[k] ?? ''));
+  if (r.descricao?.trim()) {
+    // Modelo com {grupo}: só vale se algum grupo citado veio preenchido (senão sobraria "Pix de").
+    const citados = [...r.descricao.matchAll(/\{(\w+)\}/g)].map(m => m[1]);
+    if (!citados.length || citados.some(k => grupos[k])) desc = limpa(r.descricao.replace(/\{(\w+)\}/g, (_, k) => grupos[k] ?? ''));
+  }
   if (!desc) desc = limpa(grupos.desc || '') || limpa(n.titulo) || 'Notificação';
   return {
     status: 'transacao', regra: r, grupos,

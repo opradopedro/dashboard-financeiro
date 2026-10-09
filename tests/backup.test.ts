@@ -18,7 +18,7 @@ describe('backup', () => {
   it('dados incompletos ganham os valores iniciais', () => {
     const d = sanear({ txs: [{ id: 'a', conta: 'c', data: '2026-10-01', valor: 1, origens: [] }, { id: 'b' }] });
     expect(d.txs).toHaveLength(1);
-    expect(d.contas).toHaveLength(4);
+    expect(d.contas).toHaveLength(5);
     expect(d.regras.length).toBeGreaterThan(5);
   });
 });

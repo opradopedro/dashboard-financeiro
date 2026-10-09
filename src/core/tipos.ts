@@ -79,9 +79,24 @@ export interface Notificacao {
   simulada?: boolean;
 }
 
-export interface AppMonitorado { pacote: string; nome: string; ativo: boolean }
+export interface AppMonitorado {
+  pacote: string;
+  nome: string;
+  ativo: boolean;
+  /** Conta usada pelas regras criadas automaticamente para este app (vazio = o app escolhe pelo nome do banco). */
+  conta?: string;
+}
 
 export type AcaoRegra = TipoTx | 'ignorar';
+
+/** De onde a regra veio. */
+export type OrigemRegra = 'padrao' | 'manual' | 'notificacao' | 'automatica';
+export const ORIGENS_REGRA: Record<OrigemRegra, string> = {
+  padrao: 'Veio com o app',
+  manual: 'Criada por você',
+  notificacao: 'A partir de notificação',
+  automatica: 'Automática (botão do aviso)',
+};
 export const ACOES: Record<AcaoRegra, string> = { ...TIPOS, ignorar: 'Ignorar (não vira transação)' };
 
 /** Regra que transforma notificação em transação. */
@@ -98,6 +113,8 @@ export interface RegraNotif {
   conta: string;
   prioridade: number;  // maior é testada primeiro
   ativa: boolean;
+  origem: OrigemRegra;
+  criadaEm: string;    // ISO ('' nas que vieram com o app)
 }
 
 export interface Categoria {
@@ -119,6 +136,7 @@ export interface Mapeamento {
   colValor: number;    // -1 = usa crédito/débito
   colCredito: number;
   colDebito: number;
+  colSaldo: number;    // -1 = nenhuma; com saldo, o app atualiza o saldo da conta
   inverter: boolean;   // valores positivos são gastos (comum em fatura de cartão)
   formatoData: 'auto' | 'dmy' | 'ymd' | 'mdy';
 }
@@ -136,8 +154,21 @@ export interface Importacao {
   novas: number; unidas: number; revisao: number; repetidas: number;
 }
 
+/** Avisos do app quando chega notificação de app monitorado. */
+export type ModoAvisos = 'sem-regra' | 'todas' | 'nunca';
+export const MODOS_AVISOS: Record<ModoAvisos, string> = {
+  'sem-regra': 'Só as que não têm regra',
+  todas: 'Todas (inclusive as que viraram transação)',
+  nunca: 'Não avisar',
+};
+
 export interface Config {
   boasVindasVista: boolean;
+  /** Seu nome como aparece nos bancos: Pix de/para você mesmo vira transferência interna. */
+  titular: string;
+  avisos: ModoAvisos;
+  /** Versão dos dados (migrações em migracoes.ts). */
+  versaoDados: number;
 }
 
 export interface Dados {

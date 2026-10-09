@@ -10,7 +10,20 @@ import { arred, diasEntre, norm, uid } from './util';
 export const PERTO = 1;
 export const LONGE = 3;
 
-export interface LinhaBruta { data: string; desc: string; valor: number; id?: string }
+export interface LinhaBruta { data: string; desc: string; valor: number; id?: string; saldo?: number }
+
+/**
+ * Saldo depois do movimento mais recente do arquivo (extratos trazem o saldo linha a linha).
+ * O arquivo pode vir do mais novo para o mais antigo ou ao contrário: no mesmo dia, vale a ordem dele.
+ */
+export function saldoMaisRecente(linhas: LinhaBruta[]): { data: string; valor: number } | null {
+  const com = linhas.filter(l => l.saldo != null && Number.isFinite(l.saldo));
+  if (!com.length) return null;
+  const decrescente = com[0].data > com[com.length - 1].data;
+  const ordem = decrescente ? [...com].reverse() : com;
+  const ult = ordem.reduce((a, l) => (l.data >= a.data ? l : a));
+  return { data: ult.data, valor: ult.saldo! };
+}
 
 /**
  * Chave estável de cada linha: com id do banco (FITID do OFX), usa ele; sem id, usa os dados e a

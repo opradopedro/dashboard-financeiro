@@ -4,8 +4,11 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import org.json.JSONArray
+import org.json.JSONObject
 import java.security.MessageDigest
 import java.util.UUID
+import java.util.regex.Pattern
 
 /**
  * Fila nativa persistente (SQLite) das notificações dos apps monitorados.
@@ -19,13 +22,20 @@ import java.util.UUID
  *   estão na barra. Repostar o mesmo id com o mesmo texto em até 2 minutos (atualização sem mudança)
  *   também conta como a mesma. O lado web ainda ignora chaves que já conhece.
  */
-class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notificacoes.db", null, 1) {
+class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notificacoes.db", null, 2) {
 
     data class Item(val id: Long, val chave: String, val pacote: String, val titulo: String, val texto: String, val quando: Long, val simulada: Boolean)
+    data class Decisao(val id: Long, val chave: String, val acao: String, val em: Long)
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE fila (id INTEGER PRIMARY KEY AUTOINCREMENT, chave TEXT NOT NULL UNIQUE, pacote TEXT NOT NULL, titulo TEXT NOT NULL, texto TEXT NOT NULL, quando INTEGER NOT NULL, simulada INTEGER NOT NULL DEFAULT 0)")
         criarVistas(db)
+        criarDecisoes(db)
+    }
+
+    /** Botões dos avisos (Adicionar/Ignorar) tocados com o app fechado: o app aplica ao abrir. */
+    private fun criarDecisoes(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS decisoes (id INTEGER PRIMARY KEY AUTOINCREMENT, chave TEXT NOT NULL, acao TEXT NOT NULL, em INTEGER NOT NULL)")
     }
 
     private fun criarVistas(db: SQLiteDatabase) {
@@ -34,7 +44,9 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
     }
 
     // Ao mudar o esquema: nunca apagar "vistas" (a memória evita reprocessar o que está na barra).
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) criarDecisoes(db)
+    }
 
     /** Pacotes monitorados (definidos pelo app nos Ajustes). Fora desta lista nada é gravado. */
     fun pacotes(): Set<String> = prefs.getStringSet(PACOTES, null) ?: PACOTES_INICIAIS
@@ -49,12 +61,12 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
      * Grava uma notificação, se for de app monitorado e ainda não vista.
      * @param id identidade da notificação no Android (sbn.key: pacote, id, tag); null = simulada.
      * @param quando horário da notificação (Notification.when), que distingue duas notificações iguais.
-     * @return true se entrou na fila.
+     * @return a chave, se entrou na fila; null se foi descartada ou repetida.
      */
     @Synchronized
-    fun registrar(pacote: String, titulo: String, texto: String, quando: Long, id: String?): Boolean {
-        if (pacote !in pacotes()) return false
-        if (titulo.isBlank() && texto.isBlank()) return false
+    fun registrar(pacote: String, titulo: String, texto: String, quando: Long, id: String?): String? {
+        if (pacote !in pacotes()) return null
+        if (titulo.isBlank() && texto.isBlank()) return null
         val agora = System.currentTimeMillis()
         val base = if (id == null) "sim-" + UUID.randomUUID() else hash("$pacote|$id|$titulo|$texto")
         val chave = if (id == null) base else hash("$base|$quando")
@@ -65,7 +77,7 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
                 "SELECT 1 FROM vistas WHERE chave = ? OR (base = ? AND em > ?) LIMIT 1",
                 arrayOf(chave, base, (agora - REPOST_MS).toString())
             ).use { it.moveToFirst() }
-            if (vista) return false
+            if (vista) return null
             db.insertOrThrow("vistas", null, ContentValues().apply { put("chave", chave); put("base", base); put("em", agora) })
             db.insertOrThrow("fila", null, ContentValues().apply {
                 put("chave", chave); put("pacote", pacote); put("titulo", titulo); put("texto", texto)
@@ -73,7 +85,7 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
             })
             db.delete("vistas", "em < ?", arrayOf((agora - TRINTA_DIAS).toString()))
             db.setTransactionSuccessful()
-            return true
+            return chave
         } finally {
             db.endTransaction()
         }
@@ -101,16 +113,79 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
         }
     }
 
+    // ---- Decisões dos avisos ----
+
+    @Synchronized
+    fun registrarDecisao(chave: String, acao: String) {
+        writableDatabase.insertOrThrow("decisoes", null, ContentValues().apply { put("chave", chave); put("acao", acao); put("em", System.currentTimeMillis()) })
+    }
+
+    @Synchronized
+    fun listarDecisoes(): List<Decisao> = readableDatabase.rawQuery("SELECT id, chave, acao, em FROM decisoes ORDER BY id", null).use { c ->
+        val out = ArrayList<Decisao>()
+        while (c.moveToNext()) out.add(Decisao(c.getLong(0), c.getString(1), c.getString(2), c.getLong(3)))
+        out
+    }
+
+    @Synchronized
+    fun confirmarDecisoes(ids: List<Long>) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            for (i in ids) db.delete("decisoes", "id = ?", arrayOf(i.toString()))
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    // ---- Regras (cópia enviada pelo app) para decidir o aviso com o app fechado ----
+
+    private class RegraNativa(val pacote: String, val padrao: Pattern?, val acao: String)
+    @Volatile private var cacheRegras: List<RegraNativa>? = null
+
+    /** Recebe do app as regras ativas já em ordem de prioridade, os nomes dos apps e o modo dos avisos. */
+    fun definirRegras(regras: JSONArray, nomes: JSONObject, modo: String) {
+        prefs.edit().putString(REGRAS, regras.toString()).putString(NOMES, nomes.toString()).putString(MODO, modo).apply()
+        cacheRegras = null
+    }
+
+    fun modoAvisos(): String = prefs.getString(MODO, null) ?: "sem-regra"
+
+    fun nomeApp(pacote: String): String = try { JSONObject(prefs.getString(NOMES, "{}")!!).optString(pacote, pacote) } catch (_: Exception) { pacote }
+
+    private fun regras(): List<RegraNativa> = cacheRegras ?: run {
+        val arr = try { JSONArray(prefs.getString(REGRAS, "[]")) } catch (_: Exception) { JSONArray() }
+        val out = ArrayList<RegraNativa>()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            // Expressão que o Java não entende vale como "não casou" (o app decide ao abrir).
+            val p = try { Pattern.compile(o.optString("padrao"), Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CASE) } catch (_: Exception) { null }
+            out.add(RegraNativa(o.optString("pacote"), p, o.optString("acao")))
+        }
+        out.also { cacheRegras = it }
+    }
+
+    /** O que a primeira regra que casar faria: "ignorar", um tipo de transação, ou null (sem regra). */
+    fun avaliar(pacote: String, titulo: String, texto: String): String? {
+        val t = titulo.trim() + "\n" + texto.trim()
+        for (r in regras()) if (r.pacote == pacote && r.padrao?.matcher(t)?.find() == true) return r.acao
+        return null
+    }
+
     @Synchronized
     fun pendentes(): Long = readableDatabase.rawQuery("SELECT COUNT(*) FROM fila", null).use { it.moveToFirst(); it.getLong(0) }
 
     companion object {
         private const val PACOTES = "pacotes"
+        private const val REGRAS = "regras"
+        private const val NOMES = "nomes"
+        private const val MODO = "modoAvisos"
         private const val TRINTA_DIAS = 30L * 24 * 60 * 60 * 1000
         /** Repostagem do mesmo id com o mesmo texto dentro deste intervalo é a mesma notificação. */
         private const val REPOST_MS = 2L * 60 * 1000
         /** Mesma lista inicial do app (src/core/padroes.ts), usada até o app abrir pela primeira vez. */
-        val PACOTES_INICIAIS = setOf("com.mercadopago.wallet", "com.nu.production", "br.com.rico.mobile")
+        val PACOTES_INICIAIS = setOf("com.mercadopago.wallet", "com.nu.production", "br.com.rico.mobile", "br.com.flashapp")
 
         @Volatile private var inst: Fila? = null
         fun de(ctx: Context): Fila = inst ?: synchronized(this) { inst ?: Fila(ctx.applicationContext).also { inst = it } }

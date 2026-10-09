@@ -42,7 +42,9 @@ class Ouvinte : NotificationListenerService() {
             val texto = (ex.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: linhas ?: ex.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: "").trim()
             val quando = if (n.`when` > 0) n.`when` else sbn.postTime
             // Identidade: sbn.key (pacote, id, tag) + texto + horário; ver Fila.registrar.
-            if (fila.registrar(sbn.packageName, titulo, texto, quando, sbn.key)) NotificacoesPlugin.avisarNova()
+            val chave = fila.registrar(sbn.packageName, titulo, texto, quando, sbn.key) ?: return
+            NotificacoesPlugin.avisarNova()
+            Avisos.talvezAvisar(this, chave, sbn.packageName, titulo, texto)
         } catch (e: Exception) {
             Log.e(TAG, "falha ao guardar notificação", e)
         }

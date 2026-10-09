@@ -1,0 +1,14 @@
+{
+ "mp-pix-recebido": "(?:recebeu|recebido|recebemos)[\\s\\S]*?R\\$\\s?(?<valor>\\d[\\d.]*,\\d{2})(?:[\\s\\S]*?\\bde\\s+(?<desc>[^.\\n]+?)(?:\\.|\\n|$))?",
+ "mp-pix-enviado": "(?:enviou|enviado|enviamos|transferiu|transfer[eê]ncia enviada)[\\s\\S]*?R\\$\\s?(?<valor>\\d[\\d.]*,\\d{2})(?:[\\s\\S]*?\\bpara\\s+(?<desc>[^.\\n]+?)(?:\\.|\\n|$))?",
+ "mp-reservado": "(?:reservou|reservado|guardou|guardado)[\\s\\S]*?R\\$\\s?(?<valor>\\d[\\d.]*,\\d{2})",
+ "mp-retirado": "(?:retirou|retirado|resgatou|resgatado)[\\s\\S]*?R\\$\\s?(?<valor>\\d[\\d.]*,\\d{2})",
+ "mp-fatura": "(?:pag\\w*[\\s\\S]*?fatura|fatura[\\s\\S]*?paga)[\\s\\S]*?R\\$\\s?(?<valor>\\d[\\d.]*,\\d{2})",
+ "mp-compra-credito": "^(?=[\\s\\S]*cr[ée]dito)[\\s\\S]*?(?:compra|pagamento)[\\s\\S]*?R\\$\\s?(?<valor>\\d[\\d.]*,\\d{2})(?:[\\s\\S]*?\\bem\\s+(?<desc>[^.\\n]+?)(?:\\s+com\\b|\\s+no\\b|\\.|\\n|$))?",
+ "mp-compra-debito": "(?:compra|pagamento)[\\s\\S]*?R\\$\\s?(?<valor>\\d[\\d.]*,\\d{2})(?:[\\s\\S]*?\\bem\\s+(?<desc>[^.\\n]+?)(?:\\s+com\\b|\\s+no\\b|\\.|\\n|$))?",
+ "nu-compra": "compra\\s+(?:de\\s+)?R\\$\\s?(?<valor>\\d[\\d.]*,\\d{2})[\\s\\S]*?aprovada\\s+(?:em|no|na)\\s+(?<desc>[\\s\\S]+?)(?:\\s+para o cart[aã]o|\\.|\\n|$)",
+ "nu-estorno": "estorn\\w*[\\s\\S]*?R\\$\\s?(?<valor>\\d[\\d.]*,\\d{2})(?:[\\s\\S]*?\\b(?:em|de)\\s+(?<desc>[^.\\n]+?)(?:\\.|\\n|$))?",
+ "nu-pagamento": "pagamento[\\s\\S]*?(?:recebido|recebemos|fatura)[\\s\\S]*?R\\$\\s?(?<valor>\\d[\\d.]*,\\d{2})",
+ "rico-investimentos": "aplica|resgat|ordem|dividend|rendiment|provent|tesouro|\\bcdb\\b|\\blci\\b|\\blca\\b|fundo|a[cç](?:ão|ões|oes)\\b|investim|corretag|\\bjcp\\b|cust[oó]dia|carteira|preg[aã]o|bolsa",
+ "rico-compra": "(?:compra|transa[cç][aã]o)[\\s\\S]*?R\\$\\s?(?<valor>\\d[\\d.]*,\\d{2})(?:[\\s\\S]*?\\b(?:em|no|na)\\s+(?<desc>[^.\\n]+?)(?:\\s+com\\b|\\s+no cart|\\.|\\n|$))?"
+}

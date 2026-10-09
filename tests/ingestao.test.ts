@@ -28,7 +28,7 @@ describe('notificação → transação', () => {
   it('sem regra fica registrada; reprocessar depois de criar a regra vira transação mantendo sua categoria', () => {
     let d: Dados = receber(dadosIniciais(), [item('k', 'com.nu.production', 'Novidade', 'Pagamento de boleto R$ 99,00 agendado')]).dados;
     expect(d.notifs[0].status).toBe('sem-regra');
-    d = { ...d, regras: [...d.regras, { id: 'nova', nome: 'boleto', pacote: 'com.nu.production', padrao: String.raw`boleto R\$ (?<valor>[\d.]+,\d{2})`, acao: 'saida', sentido: 'sai', conta: 'nubank-cartao', prioridade: 1, ativa: true }] };
+    d = { ...d, regras: [...d.regras, { id: 'nova', nome: 'boleto', pacote: 'com.nu.production', padrao: String.raw`boleto R\$ (?<valor>[\d.]+,\d{2})`, acao: 'saida', sentido: 'sai', conta: 'nubank-cartao', prioridade: 1, ativa: true, origem: 'manual' as const, criadaEm: '' }] };
     d = reprocessar(d, ['k']);
     expect(d.notifs[0].status).toBe('transacao');
     const id = d.txs[0].id;

@@ -9,6 +9,9 @@
     <!-- Para o botão "Liberar bateria" abrir o pedido direto (sem isso o Android pode parar o serviço). -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- Avisos do próprio app (Ignorar/Adicionar) quando chega notificação sem regra. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="false"
         android:fullBackupContent="false"
@@ -45,5 +48,8 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Botões Ignorar/Adicionar dos avisos (só o próprio app dispara). -->
+        <receiver android:name=".notificacoes.AcaoReceiver" android:exported="false" />
     </application>
 </manifest>
