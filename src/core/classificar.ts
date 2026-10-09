@@ -1,0 +1,143 @@
+// Classificação das transações (adaptada do carteira, src/banco/classificar.ts): o que é entrada e
+// saída de verdade, o que é dinheiro seu só mudando de lugar (caixinha, outra conta sua, pagamento
+// da fatura) e em que categoria cada gasto cai. Funções puras, testadas em tests/classificar.test.ts.
+import type { Categoria, Conta, RegraCat, TipoTx, Transacao } from './tipos';
+import { diasEntre, norm } from './util';
+
+const CAIXINHA = / (caixinhas?|cofrinhos?|cofre|dinheiro reservado|dinheiro retirado|reservado|retirada da reserva|guardado|porquinho|aplicacao|aplic|resgate|cdb|lci|lca|tesouro direto|investimento|fundo de investimento|previdencia) /;
+const FATURA = / (pagamento (da |de )?fatura|pagto fatura|pgto fatura|pagamento cartao|pagamento de cartao|fatura cartao|pagamento recebido|pagamento efetuado|credit card payment) /;
+
+/** Tipo automático de uma transação, olhando só para ela (sem regra nem escolha sua). */
+export function tipoAuto(desc: string, valor: number, cartao: boolean): TipoTx {
+  const t = norm(desc);
+  if (cartao) {
+    // No cartão: entrada é pagamento da fatura ou estorno (estorno desconta do gasto, por isso "saída" positiva).
+    if (valor > 0 && FATURA.test(t)) return 'fatura';
+    return 'saida';
+  }
+  if (CAIXINHA.test(t)) return 'caixinha';
+  if (FATURA.test(t)) return 'fatura';
+  return valor >= 0 ? 'entrada' : 'saida';
+}
+
+/** Índice de palavras das categorias: vence o trecho mais longo encontrado na descrição. */
+export function indicePalavras(cats: Categoria[]) {
+  const itens: { re: RegExp; cat: string; n: number; receita: boolean }[] = [];
+  for (const c of cats) for (const p0 of c.palavras) {
+    const pref = p0.endsWith('*');
+    const p = norm(pref ? p0.slice(0, -1) : p0).trim();
+    if (!p) continue;
+    const esc = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    itens.push({ re: new RegExp(` ${esc}${pref ? '' : ' '}`), cat: c.nome, n: p.length, receita: c.receita });
+  }
+  return (desc: string, entrada: boolean): string | null => {
+    const t = norm(desc);
+    let melhor: { cat: string; n: number } | null = null;
+    for (const i of itens) {
+      if (i.receita !== entrada) continue; // entrada só cai em categoria de receita, e vice-versa
+      if ((!melhor || i.n > melhor.n) && i.re.test(t)) melhor = i;
+    }
+    return melhor?.cat ?? null;
+  };
+}
+
+export interface Classificada extends Transacao {
+  t: TipoTx;          // tipo final
+  c: string;          // categoria final ('' = sem categoria)
+  auto: boolean;      // tipo decidido pelo app (sem escolha sua nem regra de categoria)
+}
+
+export interface Contexto { contas: Conta[]; categorias: Categoria[]; regrasCat: RegraCat[] }
+
+/**
+ * Classifica todas as transações. Além do tipo de cada uma, junta pares: o mesmo valor saindo de
+ * uma conta sua e entrando em outra conta sua em até 3 dias é transferência interna; o pagamento
+ * da fatura na conta casa com o crédito no cartão (até 5 dias).
+ */
+export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
+  const tipoConta = new Map(ctx.contas.map(c => [c.id, c.tipo]));
+  const regras = ctx.regrasCat.map(r => ({ ...r, t: ` ${r.termo} ` }));
+  const catPorPalavra = indicePalavras(ctx.categorias);
+
+  const out: Classificada[] = txs.map(tx => {
+    const cartao = tipoConta.get(tx.conta) === 'cartao';
+    let t: TipoTx = tx.tipo ?? tipoAuto(tx.desc, tx.valor, cartao);
+    let c: string | null = null;
+    let auto = true;
+    const d = norm(tx.desc);
+    for (const r of regras) if (d.includes(r.t)) { if (r.tipo) { t = r.tipo; auto = false; } if (r.cat) c = r.cat; }
+    if (tx.tipoUsuario) { t = tx.tipoUsuario; auto = false; }
+    if (tx.cat) c = tx.cat;
+    if (c == null) c = catPorPalavra(tx.desc, t === 'entrada') ?? '';
+    return { ...tx, t, c, auto };
+  });
+
+  // Pares entre contas diferentes (ex.: Pix da sua conta do banco A para a do banco B).
+  const livres = out.filter(x => x.auto && (x.t === 'entrada' || x.t === 'saida') && tipoConta.get(x.conta) !== 'cartao');
+  const usados = new Set<Classificada>();
+  for (const e of livres) {
+    if (e.valor <= 0 || usados.has(e)) continue;
+    const s = livres.find(x => !usados.has(x) && x.valor < 0 && x.conta !== e.conta && Math.abs(x.valor + e.valor) < 0.005 && diasEntre(x.data, e.data) <= 3);
+    if (s) { e.t = 'interna'; s.t = 'interna'; usados.add(e); usados.add(s); }
+  }
+  // Pagamento da fatura: débito na conta com o mesmo valor do crédito no cartão, em até 5 dias.
+  const creditosCartao = out.filter(x => tipoConta.get(x.conta) === 'cartao' && x.valor > 0 && x.t !== 'fatura' && x.auto && !x.tipo);
+  for (const cc of creditosCartao) {
+    const p = out.find(x => x.auto && !usados.has(x) && tipoConta.get(x.conta) !== 'cartao' && x.valor < 0
+      && (x.t === 'saida' || x.t === 'fatura') && Math.abs(x.valor + cc.valor) < 0.005 && diasEntre(x.data, cc.data) <= 5);
+    if (p) { p.t = 'fatura'; cc.t = 'fatura'; usados.add(p); usados.add(cc); }
+  }
+  return out;
+}
+
+export const SEM_CATEGORIA = 'Sem categoria';
+
+export interface ResumoMes {
+  entradas: number;
+  saidas: number;        // já descontados os estornos
+  saldo: number;
+  fora: { caixinha: number; interna: number; fatura: number }; // volume movimentado que não conta
+  porCategoria: { cat: string; v: number; n: number }[];
+  entradasPorCategoria: { cat: string; v: number; n: number }[];
+  semCategoria: number;  // quantas transações que contam estão sem categoria
+}
+
+export function resumoMes(cls: Classificada[], mes: string, conta?: string): ResumoMes {
+  let entradas = 0, saidas = 0, semCategoria = 0;
+  const fora = { caixinha: 0, interna: 0, fatura: 0 };
+  const gastos = new Map<string, { v: number; n: number }>(), ganhos = new Map<string, { v: number; n: number }>();
+  const soma = (m: Map<string, { v: number; n: number }>, k: string, v: number) => { const g = m.get(k) || { v: 0, n: 0 }; g.v += v; g.n++; m.set(k, g); };
+  for (const x of cls) {
+    if (x.data.slice(0, 7) !== mes || (conta && x.conta !== conta)) continue;
+    const cat = x.c || SEM_CATEGORIA;
+    if (x.t === 'entrada') { entradas += x.valor; soma(ganhos, cat, x.valor); if (!x.c) semCategoria++; }
+    else if (x.t === 'saida') { saidas -= x.valor; soma(gastos, cat, -x.valor); if (!x.c) semCategoria++; }
+    else fora[x.t] += Math.abs(x.valor);
+  }
+  const lista = (m: Map<string, { v: number; n: number }>) =>
+    [...m].map(([cat, g]) => ({ cat, v: g.v, n: g.n })).filter(g => g.v > 0.005).sort((a, b) => b.v - a.v);
+  return { entradas, saidas, saldo: entradas - saidas, fora, porCategoria: lista(gastos), entradasPorCategoria: lista(ganhos), semCategoria };
+}
+
+/** Entradas e saídas dos últimos `n` meses até `mes` (inclusive). */
+export function serieMeses(cls: Classificada[], mes: string, n = 12): { mes: string; entradas: number; saidas: number }[] {
+  const meses: string[] = [];
+  let [y, m] = mes.split('-').map(Number);
+  for (let i = 0; i < n; i++) { meses.unshift(`${y}-${String(m).padStart(2, '0')}`); if (--m === 0) { m = 12; y--; } }
+  const idx = new Map(meses.map((k, i) => [k, i]));
+  const out = meses.map(k => ({ mes: k, entradas: 0, saidas: 0 }));
+  for (const x of cls) {
+    const i = idx.get(x.data.slice(0, 7));
+    if (i == null) continue;
+    if (x.t === 'entrada') out[i].entradas += x.valor;
+    else if (x.t === 'saida') out[i].saidas -= x.valor;
+  }
+  return out;
+}
+
+/** Saldo estimado: saldo informado na data de referência + transações depois dela. */
+export function saldoEstimado(txs: Transacao[], conta: Conta): number | null {
+  if (!conta.saldoRef) return null;
+  const ref = conta.saldoRef;
+  return Math.round((ref.valor + txs.filter(t => t.conta === conta.id && t.data > ref.data).reduce((s, t) => s + t.valor, 0)) * 100) / 100;
+}
