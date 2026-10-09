@@ -118,13 +118,30 @@ jobs:
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
           NOME: ${{ needs.build.outputs.nome }}
         run: |
+          set -o pipefail
+          falha() { echo "::error title=Assinatura::$1"; exit 1; }
+          # Colar pelo celular costuma trazer espaço ou quebra de linha a mais: limpa antes de usar.
+          limpa() { printf '%s' "$1" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+          export KS_PASS="$(limpa "$KS_PASS")" KEY_PASS="$(limpa "$KEY_PASS")"
+          ALIAS="$(limpa "$ALIAS")"
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          echo "$KS" | base64 -d > "$RUNNER_TEMP/chave.keystore"
-          "$BT/zipalign" -f 4 app-release-unsigned.apk alinhado.apk
+          echo "build-tools: $BT"
+          [ -x "$BT/apksigner" ] || falha "apksigner não encontrado em $BT."
+          CHAVE="$RUNNER_TEMP/chave.keystore"
+          printf '%s' "$KS" | tr -d '[:space:]' | base64 -d > "$CHAVE" 2>/dev/null \
+            || falha "ANDROID_KEYSTORE_BASE64 não é um base64 válido. Cole de novo o bloco inteiro (uma linha só, sem nada antes ou depois)."
+          echo "keystore: $(wc -c < "$CHAVE") bytes"
+          [ "$(wc -c < "$CHAVE")" -gt 500 ] || falha "ANDROID_KEYSTORE_BASE64 parece incompleto (keystore muito pequena). Cole de novo o bloco inteiro."
+          keytool -list -keystore "$CHAVE" -storetype PKCS12 -storepass:env KS_PASS > /dev/null 2>&1 \
+            || falha "A senha em ANDROID_KEYSTORE_PASSWORD não abre a keystore (ou o base64 está errado)."
+          keytool -list -keystore "$CHAVE" -storetype PKCS12 -storepass:env KS_PASS -alias "$ALIAS" > /dev/null 2>&1 \
+            || falha "O alias em ANDROID_KEY_ALIAS não existe nesta keystore."
+          "$BT/zipalign" -f 4 app-release-unsigned.apk alinhado.apk || falha "zipalign falhou."
           APK="dashboard-financeiro-v$NOME.apk"
-          "$BT/apksigner" sign --ks "$RUNNER_TEMP/chave.keystore" --ks-pass env:KS_PASS --ks-key-alias "$ALIAS" --key-pass env:KEY_PASS --out "$APK" alinhado.apk
-          "$BT/apksigner" verify --print-certs "$APK" | grep -E "Signer #1 certificate (DN|SHA-256)"
-          rm -f "$RUNNER_TEMP/chave.keystore"
+          "$BT/apksigner" sign --ks "$CHAVE" --ks-pass env:KS_PASS --ks-key-alias "$ALIAS" --key-pass env:KEY_PASS --out "$APK" alinhado.apk \
+            || falha "apksigner não conseguiu assinar (confira ANDROID_KEY_PASSWORD)."
+          "$BT/apksigner" verify --print-certs "$APK" || falha "A assinatura do APK não confere."
+          rm -f "$CHAVE"
           echo "APK=$APK" >> "$GITHUB_ENV"
 
       - name: Notas da Release
