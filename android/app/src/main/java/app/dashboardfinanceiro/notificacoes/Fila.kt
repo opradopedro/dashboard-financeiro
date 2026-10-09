@@ -48,6 +48,12 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
         if (oldVersion < 2) criarDecisoes(db)
     }
 
+    // Garante a tabela de decisões em qualquer caso (ex.: banco de uma versão de teste).
+    override fun onOpen(db: SQLiteDatabase) {
+        super.onOpen(db)
+        if (!db.isReadOnly) criarDecisoes(db)
+    }
+
     /** Pacotes monitorados (definidos pelo app nos Ajustes). Fora desta lista nada é gravado. */
     fun pacotes(): Set<String> = prefs.getStringSet(PACOTES, null) ?: PACOTES_INICIAIS
 

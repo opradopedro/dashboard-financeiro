@@ -146,22 +146,24 @@ export function telaBoasVindas(el: HTMLElement) {
 
 export function telaApps(el: HTMLElement) {
   const d = state.dados;
-  el.innerHTML = `<div class="panel">
-    <div class="sub">Só as notificações destes apps são lidas; as de qualquer outro app são descartadas pelo serviço sem gravar nada. O nome do pacote está no link do app na Play Store (depois de <code>id=</code>).</div>
-    <div class="list">${d.apps.map((a, i) => `<div class="item">
+  const qtd = (n: number, um: string, varios: string) => (n === 1 ? `1 ${um}` : `${n} ${varios}`);
+  el.innerHTML = `<p class="sub">Só as notificações destes apps são lidas; as de qualquer outro app são descartadas sem gravar nada. O nome do pacote está no link do app na Play Store, depois de <code>id=</code>.</p>
+  <div class="folha"><div class="list">${d.apps.map((a, i) => `<div class="item">
       <div class="name">${esc(a.nome)}</div>
       <div class="val"><label class="switch"><input type="checkbox" data-ativo="${i}"${a.ativo ? ' checked' : ''}> ativo</label></div>
-      <div class="meta"><code>${esc(a.pacote)}</code> · ${d.notifs.filter(n => n.pacote === a.pacote).length} notificações · ${d.regras.filter(r => r.pacote === a.pacote).length} regras</div>
-      <div class="meta r"><button type="button" class="btn small danger" data-del="${i}">Remover</button></div></div>`).join('') || '<div class="empty">Nenhum app.</div>'}</div>
-  </div>
-  <div class="panel"><h2>Adicionar app</h2>
+      <div class="meta"><code>${esc(a.pacote)}</code><br>${qtd(d.notifs.filter(n => n.pacote === a.pacote).length, 'notificação', 'notificações')}, ${qtd(d.regras.filter(r => r.pacote === a.pacote).length, 'regra', 'regras')}</div>
+      <div class="meta r"><button type="button" class="btn small danger" data-del="${i}">Remover</button></div>
+      <div class="field full" style="grid-column:1/-1;margin-top:6px"><label for="conta${i}">Conta usada pelo botão Adicionar</label>
+        <select id="conta${i}" data-conta="${i}"><option value="">Escolher pelo nome do banco</option>${opcoes(d.contas.map(c => ({ v: c.id, t: c.nome })), a.conta || '')}</select></div></div>`).join('') || '<div class="empty">Nenhum app.</div>'}</div></div>
+  <section class="caixa"><h2>Adicionar app</h2>
     <form id="fApp" class="form" autocomplete="off">
       <div class="field"><label for="aNome">Nome</label><input id="aNome" placeholder="Inter" required></div>
       <div class="field"><label for="aPac">Pacote</label><input id="aPac" placeholder="br.com.intermedium" spellcheck="false" autocapitalize="off" required></div>
-      <div class="row full"><button class="btn primary" type="submit">Adicionar</button></div>
-    </form></div>`;
-  const salvar = async (f: (a: typeof d.apps) => typeof d.apps) => { await mudar(dd => ({ ...dd, apps: f(dd.apps) })); await enviarPacotes(); await atualizarEstado(); dispatchEvent(new Event('rerender')); };
+      <div class="row full"><button class="btn primary" type="submit">Adicionar app</button></div>
+    </form></section>`;
+  const salvar = async (f: (a: typeof d.apps) => typeof d.apps) => { await mudar(dd => ({ ...dd, apps: f(dd.apps) })); await atualizarEstado(); dispatchEvent(new Event('rerender')); };
   el.querySelectorAll<HTMLInputElement>('[data-ativo]').forEach(x => (x.onchange = () => salvar(apps => apps.map((a, i) => (i === +x.dataset.ativo! ? { ...a, ativo: x.checked } : a)))));
+  el.querySelectorAll<HTMLSelectElement>('[data-conta]').forEach(x => (x.onchange = () => salvar(apps => apps.map((a, i) => (i === +x.dataset.conta! ? { ...a, conta: x.value || undefined } : a)))));
   el.querySelectorAll<HTMLButtonElement>('[data-del]').forEach(x => (x.onclick = () => {
     if (confirm('Remover este app da lista? As notificações e regras dele continuam guardadas.')) void salvar(apps => apps.filter((_, i) => i !== +x.dataset.del!));
   }));
@@ -178,10 +180,10 @@ export function telaApps(el: HTMLElement) {
 
 export function telaContas(el: HTMLElement) {
   const d = state.dados;
-  el.innerHTML = `<div class="panel"><div class="list">${d.contas.map(c => `<button type="button" class="item${c.ativa ? '' : ' fora'}" data-ir="conta/${esc(c.id)}">
-    <div class="name">${esc(c.nome)}</div><div class="val">›</div>
-    <div class="meta">${c.tipo === 'cartao' ? 'Cartão de crédito' : 'Conta'} · ${esc(c.banco)} · ${d.txs.filter(t => t.conta === c.id).length} transações</div><div class="meta r">${c.ativa ? '' : 'desativada'}</div></button>`).join('')}</div>
-    <div class="row"><button type="button" class="btn primary" data-ir="conta/nova">+ Nova conta</button></div></div>`;
+  el.innerHTML = `<div class="folha"><div class="list">${d.contas.map(c => `<button type="button" class="item${c.ativa ? '' : ' fora'}" data-ir="conta/${esc(c.id)}">
+    <div class="name">${esc(c.nome)}</div><div class="val"></div>
+    <div class="meta">${c.tipo === 'cartao' ? 'Cartão de crédito' : 'Conta'} do ${esc(c.banco)}, ${d.txs.filter(t => t.conta === c.id).length} transações</div><div class="meta r">${c.ativa ? '' : 'desativada'}</div></button>`).join('')}</div></div>
+    <div class="row"><button type="button" class="btn primary" data-ir="conta/nova">Nova conta</button></div>`;
 }
 
 export function telaConta(el: HTMLElement, id: string) {
@@ -280,7 +282,7 @@ export function telaDados(el: HTMLElement) {
   const d = state.dados;
   el.innerHTML = `<div class="panel">
     <h2>Backup</h2>
-    <div class="sub">Salva tudo (transações, notificações, regras, contas, categorias, modelos) num arquivo .json. Guarde fora do celular (Drive, e-mail). ${d.txs.length} transações · ${d.notifs.length} notificações.</div>
+    <div class="sub">Salva tudo (transações, notificações, regras, contas, categorias, modelos) num arquivo .json. Guarde fora do celular (Drive, e-mail). Hoje: ${d.txs.length} transações e ${d.notifs.length} notificações.</div>
     <div class="row"><button type="button" class="btn primary" id="btnBackup">Salvar backup</button></div>
   </div>
   <div class="panel">

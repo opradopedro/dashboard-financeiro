@@ -78,46 +78,66 @@ class NotificacoesPlugin : Plugin() {
 
     @PluginMethod
     fun estado(call: PluginCall) {
-        val pm = context.getSystemService(PowerManager::class.java)
-        call.resolve(JSObject().apply {
-            put("acessoPermitido", NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName))
-            put("servicoConectado", Ouvinte.conectado)
-            put("bateriaLiberada", pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false)
-            put("android", Build.VERSION.SDK_INT)
-            put("fabricante", Build.MANUFACTURER ?: "")
-            put("pendentes", fila().pendentes())
-            put("pacotes", JSArray(fila().pacotes().sorted()))
-            put("avisosPermitidos", NotificationManagerCompat.from(context).areNotificationsEnabled())
-        })
+        try {
+            val pm = context.getSystemService(PowerManager::class.java)
+            call.resolve(JSObject().apply {
+                put("acessoPermitido", NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName))
+                put("servicoConectado", Ouvinte.conectado)
+                put("bateriaLiberada", pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false)
+                put("android", Build.VERSION.SDK_INT)
+                put("fabricante", Build.MANUFACTURER ?: "")
+                put("pendentes", fila().pendentes())
+                put("pacotes", JSArray(fila().pacotes().sorted()))
+                put("avisosPermitidos", NotificationManagerCompat.from(context).areNotificationsEnabled())
+            })
+        } catch (e: Exception) {
+            call.reject("Falha no Android: ${e.message}")
+        }
     }
 
     /** Regras ativas (em ordem de prioridade), nomes dos apps e modo dos avisos, para decidir o aviso com o app fechado. */
     @PluginMethod
     fun definirRegras(call: PluginCall) {
-        val regras = call.getArray("regras") ?: return call.reject("Faltou a lista de regras.")
-        fila().definirRegras(regras, call.getObject("nomes") ?: JSONObject(), call.getString("modo") ?: "sem-regra")
-        call.resolve()
+        try {
+            val regras = call.getArray("regras") ?: return call.reject("Faltou a lista de regras.")
+            fila().definirRegras(regras, call.getObject("nomes") ?: JSONObject(), call.getString("modo") ?: "sem-regra")
+            call.resolve()
+        } catch (e: Exception) {
+            call.reject("Falha no Android: ${e.message}")
+        }
     }
 
     @PluginMethod
     fun lerDecisoes(call: PluginCall) {
-        val itens = JSArray()
-        for (d in fila().listarDecisoes()) itens.put(JSObject().apply { put("id", d.id); put("chave", d.chave); put("acao", d.acao); put("em", d.em) })
-        call.resolve(JSObject().apply { put("itens", itens) })
+        try {
+            val itens = JSArray()
+            for (d in fila().listarDecisoes()) itens.put(JSObject().apply { put("id", d.id); put("chave", d.chave); put("acao", d.acao); put("em", d.em) })
+            call.resolve(JSObject().apply { put("itens", itens) })
+        } catch (e: Exception) {
+            call.reject("Falha no Android: ${e.message}")
+        }
     }
 
     @PluginMethod
     fun confirmarDecisoes(call: PluginCall) {
-        val arr = call.getArray("ids") ?: return call.reject("Faltou a lista de ids.")
-        fila().confirmarDecisoes((0 until arr.length()).map { arr.getLong(it) })
-        call.resolve()
+        try {
+            val arr = call.getArray("ids") ?: return call.reject("Faltou a lista de ids.")
+            fila().confirmarDecisoes((0 until arr.length()).map { arr.getLong(it) })
+            call.resolve()
+        } catch (e: Exception) {
+            call.reject("Falha no Android: ${e.message}")
+        }
     }
 
     @PluginMethod
     fun cancelarAvisos(call: PluginCall) {
-        val arr = call.getArray("chaves") ?: return call.reject("Faltou a lista de chaves.")
-        for (i in 0 until arr.length()) Avisos.cancelar(context, arr.getString(i))
-        call.resolve()
+        try {
+            val arr = call.getArray("chaves") ?: return call.reject("Faltou a lista de chaves.")
+            for (i in 0 until arr.length()) Avisos.cancelar(context, arr.getString(i))
+            call.resolve()
+        } catch (e: Exception) {
+            call.reject("Falha no Android: ${e.message}")
+        }
     }
 
     /** Android 13+: pede a permissão de mostrar notificações. Antes disso, já vem liberada. */
@@ -144,42 +164,58 @@ class NotificacoesPlugin : Plugin() {
 
     @PluginMethod
     fun definirPacotes(call: PluginCall) {
-        val arr = call.getArray("pacotes") ?: return call.reject("Faltou a lista de pacotes.")
-        val set = HashSet<String>()
-        for (i in 0 until arr.length()) arr.optString(i)?.trim()?.takeIf { it.isNotEmpty() }?.let { set.add(it) }
-        fila().definirPacotes(set)
-        call.resolve()
+        try {
+            val arr = call.getArray("pacotes") ?: return call.reject("Faltou a lista de pacotes.")
+            val set = HashSet<String>()
+            for (i in 0 until arr.length()) arr.optString(i)?.trim()?.takeIf { it.isNotEmpty() }?.let { set.add(it) }
+            fila().definirPacotes(set)
+            call.resolve()
+        } catch (e: Exception) {
+            call.reject("Falha no Android: ${e.message}")
+        }
     }
 
     @PluginMethod
     fun lerFila(call: PluginCall) {
-        val itens = JSArray()
-        for (it in fila().listar()) itens.put(JSObject().apply {
-            put("id", it.id); put("chave", it.chave); put("pacote", it.pacote); put("titulo", it.titulo)
-            put("texto", it.texto); put("quando", it.quando); put("simulada", it.simulada)
-        })
-        call.resolve(JSObject().apply { put("itens", itens) })
+        try {
+            val itens = JSArray()
+            for (it in fila().listar()) itens.put(JSObject().apply {
+                put("id", it.id); put("chave", it.chave); put("pacote", it.pacote); put("titulo", it.titulo)
+                put("texto", it.texto); put("quando", it.quando); put("simulada", it.simulada)
+            })
+            call.resolve(JSObject().apply { put("itens", itens) })
+        } catch (e: Exception) {
+            call.reject("Falha no Android: ${e.message}")
+        }
     }
 
     @PluginMethod
     fun confirmar(call: PluginCall) {
-        val arr = call.getArray("ids") ?: return call.reject("Faltou a lista de ids.")
-        fila().confirmar((0 until arr.length()).map { arr.getLong(it) })
-        call.resolve()
+        try {
+            val arr = call.getArray("ids") ?: return call.reject("Faltou a lista de ids.")
+            fila().confirmar((0 until arr.length()).map { arr.getLong(it) })
+            call.resolve()
+        } catch (e: Exception) {
+            call.reject("Falha no Android: ${e.message}")
+        }
     }
 
     /** Simulação: entra pela mesma porta das notificações reais (filtro de pacote e fila). */
     @PluginMethod
     fun simular(call: PluginCall) {
-        val pacote = call.getString("pacote")?.trim().orEmpty()
-        val titulo = call.getString("titulo").orEmpty()
-        val texto = call.getString("texto").orEmpty()
-        val chave = fila().registrar(pacote, titulo, texto, System.currentTimeMillis(), null)
-        if (chave != null) {
-            avisarNova()
-            Avisos.talvezAvisar(context, chave, pacote, titulo, texto)
+        try {
+            val pacote = call.getString("pacote")?.trim().orEmpty()
+            val titulo = call.getString("titulo").orEmpty()
+            val texto = call.getString("texto").orEmpty()
+            val chave = fila().registrar(pacote, titulo, texto, System.currentTimeMillis(), null)
+            if (chave != null) {
+                avisarNova()
+                Avisos.talvezAvisar(context, chave, pacote, titulo, texto)
+            }
+            call.resolve(JSObject().apply { put("aceita", chave != null); put("chave", chave ?: "") })
+        } catch (e: Exception) {
+            call.reject("Falha no Android: ${e.message}")
         }
-        call.resolve(JSObject().apply { put("aceita", chave != null); put("chave", chave ?: "") })
     }
 
     @PluginMethod
