@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+# Nunca versionar dados pessoais nem a chave de assinatura
+*.jks
+*.keystore
+*.p12
+backup*.json
+dashboard-financeiro-backup*.json
+finai-banco*.json
+*.local.*

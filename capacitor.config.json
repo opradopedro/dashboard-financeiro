@@ -1,0 +1,12 @@
+{
+  "appId": "app.dashboardfinanceiro",
+  "appName": "Dashboard Financeiro",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SystemBars": { "style": "DARK" }
+  }
+}
