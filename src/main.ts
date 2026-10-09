@@ -48,6 +48,11 @@ function render(anim = true) {
   $$('nav button').forEach(b => b.setAttribute('aria-current', b.dataset.aba!.split('?')[0] === r.nome ? 'page' : 'false'));
   try { t.render(el, r); } catch (e) { console.error(e); el.innerHTML = `<div class="panel"><div class="err">Erro ao abrir esta tela: ${(e as Error).message}</div></div>`; }
   if (anim) { el.classList.remove('anim'); void el.offsetWidth; el.classList.add('anim'); }
+  // Telas que mostram o estado do serviço: relê do Android ao abrir (a permissão pode ter mudado lá fora).
+  if (anim && (r.nome === 'ajustes' || r.nome === 'boasvindas')) {
+    const antes = JSON.stringify(state.nativo);
+    void atualizarEstado().then(n => { if (JSON.stringify(n) !== antes && rotaAtual().nome === r.nome) render(false); });
+  }
 }
 
 let ultimaRota = '';

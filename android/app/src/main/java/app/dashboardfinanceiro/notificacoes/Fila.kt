@@ -14,8 +14,10 @@ import java.util.UUID
  *   processo morrer logo depois.
  * - O lado web lê a fila ao abrir, guarda no próprio banco e só então confirma; só o que foi
  *   confirmado sai da fila. Se o app fechar no meio, os itens continuam aqui.
- * - A tabela "vistas" lembra as chaves por 30 dias: a mesma notificação repostada (atualização,
- *   reconexão do serviço) não entra de novo. O lado web também ignora chaves que já conhece.
+ * - A tabela "vistas" lembra as chaves por 30 dias: a mesma notificação (mesmo id no Android, mesmo
+ *   texto e mesmo horário) não entra de novo, por exemplo quando o serviço reconecta e relê as que
+ *   estão na barra. Repostar o mesmo id com o mesmo texto em até 2 minutos (atualização sem mudança)
+ *   também conta como a mesma. O lado web ainda ignora chaves que já conhece.
  */
 class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notificacoes.db", null, 1) {
 
@@ -23,9 +25,15 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE fila (id INTEGER PRIMARY KEY AUTOINCREMENT, chave TEXT NOT NULL UNIQUE, pacote TEXT NOT NULL, titulo TEXT NOT NULL, texto TEXT NOT NULL, quando INTEGER NOT NULL, simulada INTEGER NOT NULL DEFAULT 0)")
-        db.execSQL("CREATE TABLE vistas (chave TEXT PRIMARY KEY, em INTEGER NOT NULL)")
+        criarVistas(db)
     }
 
+    private fun criarVistas(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE vistas (chave TEXT PRIMARY KEY, base TEXT NOT NULL, em INTEGER NOT NULL)")
+        db.execSQL("CREATE INDEX vistas_base ON vistas (base, em)")
+    }
+
+    // Ao mudar o esquema: nunca apagar "vistas" (a memória evita reprocessar o que está na barra).
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
 
     /** Pacotes monitorados (definidos pelo app nos Ajustes). Fora desta lista nada é gravado. */
@@ -39,25 +47,31 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
 
     /**
      * Grava uma notificação, se for de app monitorado e ainda não vista.
-     * @param id identidade da notificação no Android (pacote, id, tag, momento); null = simulada.
+     * @param id identidade da notificação no Android (sbn.key: pacote, id, tag); null = simulada.
+     * @param quando horário da notificação (Notification.when), que distingue duas notificações iguais.
      * @return true se entrou na fila.
      */
     @Synchronized
     fun registrar(pacote: String, titulo: String, texto: String, quando: Long, id: String?): Boolean {
         if (pacote !in pacotes()) return false
         if (titulo.isBlank() && texto.isBlank()) return false
-        val chave = if (id == null) "sim-" + UUID.randomUUID() else hash("$pacote|$id|$titulo|$texto")
+        val agora = System.currentTimeMillis()
+        val base = if (id == null) "sim-" + UUID.randomUUID() else hash("$pacote|$id|$titulo|$texto")
+        val chave = if (id == null) base else hash("$base|$quando")
         val db = writableDatabase
         db.beginTransaction()
         try {
-            val vista = db.rawQuery("SELECT 1 FROM vistas WHERE chave = ?", arrayOf(chave)).use { it.moveToFirst() }
+            val vista = db.rawQuery(
+                "SELECT 1 FROM vistas WHERE chave = ? OR (base = ? AND em > ?) LIMIT 1",
+                arrayOf(chave, base, (agora - REPOST_MS).toString())
+            ).use { it.moveToFirst() }
             if (vista) return false
-            db.insertOrThrow("vistas", null, ContentValues().apply { put("chave", chave); put("em", System.currentTimeMillis()) })
+            db.insertOrThrow("vistas", null, ContentValues().apply { put("chave", chave); put("base", base); put("em", agora) })
             db.insertOrThrow("fila", null, ContentValues().apply {
                 put("chave", chave); put("pacote", pacote); put("titulo", titulo); put("texto", texto)
                 put("quando", quando); put("simulada", if (id == null) 1 else 0)
             })
-            db.delete("vistas", "em < ?", arrayOf((System.currentTimeMillis() - TRINTA_DIAS).toString()))
+            db.delete("vistas", "em < ?", arrayOf((agora - TRINTA_DIAS).toString()))
             db.setTransactionSuccessful()
             return true
         } finally {
@@ -93,6 +107,8 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
     companion object {
         private const val PACOTES = "pacotes"
         private const val TRINTA_DIAS = 30L * 24 * 60 * 60 * 1000
+        /** Repostagem do mesmo id com o mesmo texto dentro deste intervalo é a mesma notificação. */
+        private const val REPOST_MS = 2L * 60 * 1000
         /** Mesma lista inicial do app (src/core/padroes.ts), usada até o app abrir pela primeira vez. */
         val PACOTES_INICIAIS = setOf("com.mercadopago.wallet", "com.nu.production", "br.com.rico.mobile")
 

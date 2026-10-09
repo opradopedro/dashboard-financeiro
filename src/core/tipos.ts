@@ -138,8 +138,6 @@ export interface Importacao {
 
 export interface Config {
   boasVindasVista: boolean;
-  /** Mês aberto no painel (AAAA-MM). */
-  mes?: string;
 }
 
 export interface Dados {

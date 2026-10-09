@@ -72,8 +72,7 @@ export function sanear(x: unknown): Dados {
       .map(i => ({ id: str(i.id), arquivo: str(i.arquivo), conta: str(i.conta), em: str(i.em), de: str(i.de), ate: str(i.ate),
         novas: Number(i.novas) || 0, unidas: Number(i.unidas) || 0, revisao: Number(i.revisao) || 0, repetidas: Number(i.repetidas) || 0 })),
     excluidas: Array.isArray(o.excluidas) ? o.excluidas.filter((k): k is string => typeof k === 'string') : [],
-    config: { boasVindasVista: !!(o.config as Obj | undefined)?.boasVindasVista,
-      ...(/^\d{4}-\d{2}$/.test(str((o.config as Obj | undefined)?.mes)) ? { mes: str((o.config as Obj).mes) } : {}) },
+    config: { boasVindasVista: !!(o.config as Obj | undefined)?.boasVindasVista },
   };
   return d;
 }

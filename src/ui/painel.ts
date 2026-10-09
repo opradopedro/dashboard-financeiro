@@ -6,7 +6,9 @@ import { TIPOS, contaNoTotal } from '../core/tipos';
 import { hoje, somaMes } from '../core/util';
 import { brl, compact, esc, fmtD, fmtNum, fmtYm, MES, mesLongo, sinal } from './fmt';
 
-export const mesAtual = () => state.dados.config.mes || hoje().slice(0, 7);
+// Mês aberto nas telas (só na memória: ao abrir o app, volta para o mês atual).
+let mesSel: string | null = null;
+export const mesAtual = () => mesSel || hoje().slice(0, 7);
 
 export function itemTx(x: Classificada) {
   const conta = contaNoTotal(x.t);
@@ -153,5 +155,5 @@ export function telaFora(el: HTMLElement) {
 export function mudarMes(delta: number) {
   const novo = somaMes(mesAtual(), delta);
   if (novo > hoje().slice(0, 7)) return;
-  state.dados.config.mes = novo; // preferência de tela: gravada junto na próxima mudança
+  mesSel = novo;
 }

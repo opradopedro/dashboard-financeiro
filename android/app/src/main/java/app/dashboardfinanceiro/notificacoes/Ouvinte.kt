@@ -41,8 +41,8 @@ class Ouvinte : NotificationListenerService() {
             val linhas = ex.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.joinToString("\n") { it.toString() }
             val texto = (ex.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: linhas ?: ex.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: "").trim()
             val quando = if (n.`when` > 0) n.`when` else sbn.postTime
-            // Identidade: a mesma notificação repostada tem a mesma chave, id e "when".
-            if (fila.registrar(sbn.packageName, titulo, texto, quando, "${sbn.key}|${n.`when`}")) NotificacoesPlugin.avisarNova()
+            // Identidade: sbn.key (pacote, id, tag) + texto + horário; ver Fila.registrar.
+            if (fila.registrar(sbn.packageName, titulo, texto, quando, sbn.key)) NotificacoesPlugin.avisarNova()
         } catch (e: Exception) {
             Log.e(TAG, "falha ao guardar notificação", e)
         }

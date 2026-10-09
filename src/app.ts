@@ -25,17 +25,25 @@ export function classificadas(): Classificada[] {
 const ouvintes = new Set<() => void>();
 export const aoMudar = (f: () => void) => ouvintes.add(f);
 
-let fila = Promise.resolve();
-/** Aplica uma mudança e grava. Mudanças são feitas uma de cada vez, na ordem em que chegaram. */
+let fila: Promise<unknown> = Promise.resolve();
+/**
+ * Aplica uma mudança e grava. Mudanças são feitas uma de cada vez, na ordem em que chegaram.
+ * Se a gravação falhar, a promessa é rejeitada (quem consome a fila nativa não confirma nada).
+ */
 export function mudar(f: (d: Dados) => Dados | void): Promise<void> {
-  fila = fila.then(async () => {
+  const p = fila.then(async () => {
     const novo = f(state.dados) || state.dados;
     await gravar(novo);
     state.dados = novo;
     state.versao++;
     ouvintes.forEach(o => o());
-  }).catch(e => { console.error(e); alert('Não consegui gravar os dados no aparelho: ' + (e as Error).message); });
-  return fila;
+  });
+  fila = p.catch(() => undefined);
+  return p.catch(e => {
+    console.error(e);
+    alert('Não consegui gravar os dados no aparelho: ' + (e as Error).message);
+    throw e;
+  });
 }
 
 export async function iniciarDados() {

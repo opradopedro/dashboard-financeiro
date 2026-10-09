@@ -57,7 +57,7 @@ android/           projeto Capacitor versionado
   app/src/main/java/app/dashboardfinanceiro/
     MainActivity.kt               registra o plugin
     notificacoes/Ouvinte.kt       NotificationListenerService (filtra pacote antes de ler)
-    notificacoes/Fila.kt          SQLite: fila + chaves vistas (30 dias)
+    notificacoes/Fila.kt          SQLite: fila + chaves vistas (30 dias; repost igual em 2 min = mesma)
     notificacoes/NotificacoesPlugin.kt  estado, fila, simular, atalhos de configuração,
                                   salvarArquivo (ACTION_CREATE_DOCUMENT), botão voltar
 .github/workflows/android.yml     testes → APK sem assinatura → apksigner → Release (+ espelho)
@@ -123,4 +123,6 @@ Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INI
 ## Pendências conhecidas
 
 - Regras iniciais de notificação são chute (sem textos reais); ajustar com o registro do usuário.
-- Sem teste automatizado do lado Kotlin; a verificação é a compilação no workflow.
+- Sem teste automatizado do lado Kotlin; a verificação é a compilação no workflow. Na primeira
+  entrega, captura real, fila com app em segundo plano, repost, permissões e voltar foram testados
+  num emulador Android 11 (sem aceleração, `cmd notification post` com `com.android.shell` monitorado).

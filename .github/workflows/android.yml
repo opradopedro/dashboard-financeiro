@@ -120,7 +120,7 @@ jobs:
         run: |
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           echo "$KS" | base64 -d > "$RUNNER_TEMP/chave.keystore"
-          "$BT/zipalign" -P 16 -f 4 app-release-unsigned.apk alinhado.apk
+          "$BT/zipalign" -f 4 app-release-unsigned.apk alinhado.apk
           APK="dashboard-financeiro-v$NOME.apk"
           "$BT/apksigner" sign --ks "$RUNNER_TEMP/chave.keystore" --ks-pass env:KS_PASS --ks-key-alias "$ALIAS" --key-pass env:KEY_PASS --out "$APK" alinhado.apk
           "$BT/apksigner" verify --print-certs "$APK" | grep -E "Signer #1 certificate (DN|SHA-256)"

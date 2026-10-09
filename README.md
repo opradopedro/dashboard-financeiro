@@ -194,9 +194,10 @@ Kotlin. minSdk 24 (Android 7.0), targetSdk 36. Detalhes de arquitetura em `CLAUD
 - **Deduplicação:** une sozinho só com exatamente um candidato até 1 dia; 2–3 dias ou mais de um
   candidato vai para Revisão. Transação excluída que veio de extrato não volta ao reimportar.
 - **Fila nativa em SQLite** com confirmação: o Android só apaga o item depois que o app gravou no
-  banco local. Chave de cada notificação = hash de (pacote, chave da notificação, horário, título,
-  texto); a mesma notificação repostada não entra de novo (memória de 30 dias no Android, e o app
-  também ignora chaves que já conhece). Resumos de grupo são ignorados.
+  banco local. Chave de cada notificação = hash de (pacote, id da notificação, título, texto,
+  horário); a mesma notificação não entra de novo (memória de 30 dias no Android, e o app também
+  ignora chaves que já conhece). Se um app repostar a mesma notificação (mesmo id e mesmo texto)
+  em até 2 minutos, conta como uma só. Resumos de grupo são ignorados.
 - **Sem internet:** permissão INTERNET removida do manifesto, Content-Security-Policy só com
   arquivos locais, backup automático do Android desligado.
 - **Salvar arquivos** (backup/exportação) pelo seletor do Android (“Salvar como”), sem pedir
