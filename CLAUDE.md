@@ -65,7 +65,7 @@ src/
   nativo/notificacoes.ts  ponte com o plugin Kotlin (+ imitação para navegador)
   app.ts           estado, mudar() (fila de gravações), consumirFila(), classificadas() com cache
   ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts, graficos.ts (SVG),
-                   escolher.ts (folhas: categoria com busca, opção, confirmar), novidades.ts
+                   escolher.ts (folhas: categoria com busca, opção, confirmar), datas.ts, novidades.ts
   novidades.json   histórico de versões + `proxima` (pendentes); gera as notas da Release
   main.ts          tabela de telas, navegação por data-ir/data-aba, inicialização
 android/           projeto Capacitor versionado
@@ -144,6 +144,8 @@ cartões iguais para tudo. A peça marcante é o topo do Painel (mês grande + f
 - Listas: use `<select>` normal com `<label for>`; `ativarSelects()` (escolher.ts) abre a folha do
   app no lugar da lista do Android (o CSS deixa o select sem toque; o clique é achado pela posição)
   e devolve a escolha com evento `change`. Mais de 8 opções = folha com busca.
+- Datas: use `<input type="date">` com `<label for>`; `ativarDatas()` (datas.ts) troca por campo
+  dd/mm/aaaa + calendário do app e deixa o original escondido (mesmo id, valor AAAA-MM-DD).
 - Telas com `vivo: true` em `main.ts` são refeitas quando os dados mudam; formulários não.
   Para refazer a tela atual depois de uma ação: `dispatchEvent(new Event('rerender'))`.
 - Toda mudança de dados passa por `mudar(d => novoD)` (grava e notifica). Não mutar `state.dados`.

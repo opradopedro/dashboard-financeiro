@@ -20,6 +20,7 @@ import { telaConferencia, telaImportar, telaRevisao, telaImportacao } from './ui
 import { telaApps, telaAjustes, telaBoasVindas, telaCategorias, telaConta, telaContas, telaDados } from './ui/ajustes';
 import { telaNovidades } from './ui/novidades';
 import { ativarSelects } from './ui/escolher';
+import { ativarDatas } from './ui/datas';
 
 interface Tela { titulo: string | ((r: Rota) => string); render: (el: HTMLElement, r: Rota) => void; vivo?: boolean }
 
@@ -118,6 +119,7 @@ async function iniciar() {
   $$('nav button').forEach(b => b.insertAdjacentHTML('afterbegin', ICONES[b.dataset.icone as keyof typeof ICONES] || ''));
   $('#btnVoltar').innerHTML = ICONES.voltar;
   ativarSelects();
+  ativarDatas();
   await iniciarDados();
   aoMudar(() => {
     const t = TELAS[rotaAtual().nome];

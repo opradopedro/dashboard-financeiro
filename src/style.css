@@ -295,3 +295,23 @@ select:not([multiple]){pointer-events:none}
 .imp-check{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--grafite);
   vertical-align:-4px;margin-right:10px;color:var(--noite)}
 .marcada .imp-check{background:var(--champanhe);border-color:var(--champanhe)}
+
+/* ---------- datas: campo dd/mm/aaaa + calendário ---------- */
+.campo-data{position:relative;display:flex}
+.campo-data input{padding-right:48px}
+.campo-data .cal-abrir{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:none;color:var(--grafite);
+  display:inline-flex;align-items:center;justify-content:center;border-radius:10px}
+.campo-data.invalida input{border-color:var(--erro)}
+.cal-cab{justify-content:space-between}
+.cal-cab .folha-sel-titulo{flex:1;text-align:center;font-size:18px}
+.cal-cab .folha-sel-titulo small{font-family:var(--fonte);font-weight:400;color:var(--grafite);font-size:15px;margin-left:4px}
+.cal-seta{width:44px;height:44px;border:1px solid var(--linha-forte);background:none;border-radius:50%;color:var(--papel);display:inline-flex;align-items:center;justify-content:center}
+.cal-seta svg{width:20px;height:20px}
+.cal{padding:10px 14px 18px;display:flex;flex-direction:column;gap:6px}
+.cal-semana,.cal-grade{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center}
+.cal-semana span{font-size:12.5px;color:var(--grafite);font-weight:550;padding:4px 0}
+.cal-dia{aspect-ratio:1;max-height:48px;border:0;border-radius:50%;background:none;font-size:15px;color:var(--papel);font-variant-numeric:tabular-nums}
+.cal-dia:active{background:var(--lousa-alta)}
+.cal-dia.hoje{box-shadow:inset 0 0 0 1.5px var(--linha-forte)}
+.cal-dia.atual{background:var(--champanhe);color:#1A1712;font-weight:600}
+.cal .row{margin-top:8px}
