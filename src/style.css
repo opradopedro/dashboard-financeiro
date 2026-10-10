@@ -8,6 +8,8 @@
   --papel:#E9EDF3; --grafite:#8E9AB0; --grafite-claro:#B4BDCD;
   --champanhe:#D9C8A4; --champanhe-escuro:#2A2620;
   --entrada:#3B97C9; --saida:#CF7448;
+  /* categorias (validadas para daltonismo neste fundo, nesta ordem) */
+  --cat1:#3987e5; --cat2:#d95926; --cat3:#199e70; --cat4:#c98500; --cat5:#d55181; --cat6:#9085e9; --cat-outras:#5d6a80;
   --ok:#7CC4A0; --alerta:#E3B65C; --erro:#E8806F; --alerta-fundo:#2B2617;
   --raio-g:22px; --raio-m:16px; --raio-p:12px;
   --sat:var(--safe-area-inset-top,env(safe-area-inset-top,0px));
@@ -93,7 +95,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* Linha de status (estatísticas secundárias) */
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .stats div{display:flex;flex-direction:column;gap:2px;min-width:0}
-.stats b.lg{font-size:clamp(15px,4.2vw,19px);font-weight:400;overflow-wrap:anywhere;line-height:1.25}
+.stats b.lg{font-size:clamp(13.5px,3.9vw,19px);font-weight:400;white-space:nowrap;line-height:1.25}
 
 /* ---------- avisos (o que precisa de atenção) ---------- */
 .aviso{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--alerta-fundo);color:var(--papel);border:0;
@@ -249,3 +251,10 @@ dialog.folha-sel::backdrop{background:rgba(6,9,15,.62)}
 .sel-nada{color:var(--grafite);font-size:14px;padding:14px 10px 4px}
 @media (prefers-reduced-motion:no-preference){dialog.folha-sel[open]{animation:sobe .2s ease-out}}
 @keyframes sobe{from{transform:translateY(24px);opacity:.4}to{transform:none;opacity:1}}
+
+/* ---------- painel: indicadores ---------- */
+.fita-cats{display:flex;gap:2px;height:14px;border-radius:7px;overflow:hidden}
+.fita-cats i{display:block;height:100%;min-width:3px}
+.legenda .traco{width:16px;height:0;border-radius:0;border-top:2.2px solid var(--saida)}
+.legenda .traco.ant{border-top:1.5px dashed var(--grafite)}
+.legenda .traco.proj{border-top:2px dotted var(--saida);opacity:.8}

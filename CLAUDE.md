@@ -50,6 +50,7 @@ src/
     padroes.ts     valores iniciais: contas, apps (pacotes), categorias, regras (CHUTE)
     util.ts        norm(), termoDe(), parseValor(), parseData(), datas
     classificar.ts tipo final + categoria (adaptado do carteira), resumoMes, serieMeses
+    indicadores.ts forma de pagamento, gasto por conta, ritmo do mês, dias da semana, maiores, lugares
     regras.ts      regra de notificação → transação (regex com grupos valor/desc/data)
     automatica.ts  botões Adicionar/Ignorar: gerarRegraAuto, gerarRegraIgnorar, aplicarDecisoes
     migracoes.ts   versões dos dados (v2: Flash, regras reais); regras-v1.json = regras padrão da v1
@@ -62,7 +63,8 @@ src/
   dados/db.ts      IndexedDB: um registro 'dados' com tudo, gravado inteiro a cada mudança
   nativo/notificacoes.ts  ponte com o plugin Kotlin (+ imitação para navegador)
   app.ts           estado, mudar() (fila de gravações), consumirFila(), classificadas() com cache
-  ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts
+  ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts, graficos.ts (SVG),
+                   escolher.ts (folha de escolha de categoria com busca), novidades.ts
   novidades.json   histórico de versões + `proxima` (pendentes); gera as notas da Release
   main.ts          tabela de telas, navegação por data-ir/data-aba, inicialização
 android/           projeto Capacitor versionado

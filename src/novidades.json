@@ -1,5 +1,7 @@
 {
   "proxima": [
+    "Painel com mais gráficos: ritmo do mês (gasto acumulado dia a dia, comparado ao mês anterior e com a projeção até o fim do mês), cores por categoria, como pagou (Pix, crédito, débito, vale), maiores gastos, onde mais gastou, dias da semana e gasto por conta.",
+    "Pagamento de fatura não aparece mais na frase do topo do Painel (continua fora de entradas e saídas).",
     "Escolher categoria agora abre uma lista com busca: ela filtra enquanto você digita e, se não achar, oferece “+ Adicionar categoria”.",
     "Importar vários arquivos de uma vez: o app reconhece de qual banco é cada um (Nubank, Rico, Flash, Mercado Pago e OFX de qualquer banco) e já escolhe a conta.",
     "Arquivo de banco sem conta no app (ex.: Itaú): botão para criar a conta na hora.",
