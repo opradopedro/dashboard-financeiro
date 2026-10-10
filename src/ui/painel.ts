@@ -225,6 +225,8 @@ export function telaPainel(el: HTMLElement) {
     }).join('')}</div></div>
   </section>
 
+  ${blocoFaturas(cls, mes)}
+
   <section class="panel">
     <div class="row between"><h2>Últimas do mês</h2><button type="button" class="btn small" data-aba="transacoes">Ver todas</button></div>
     <div class="folha"><div class="list">${listaPorDia(cls.filter(x => x.data.slice(0, 7) === mes).sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm)).slice(0, 8)) || '<div class="empty">Nada neste mês ainda. As transações aparecem aqui assim que chegar uma notificação, você lançar à mão ou importar um extrato.</div>'}</div></div>
@@ -239,6 +241,29 @@ export function telaPainel(el: HTMLElement) {
     el.querySelectorAll<HTMLButtonElement>('[data-top]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     el.querySelectorAll<HTMLElement>('[data-vista]').forEach(x => (x.hidden = x.dataset.vista !== vistaTop));
   }));
+}
+
+/**
+ * Faturas pagas no mês: o pagamento que aparece em cada cartão e, quando o app achou, o Pix ou
+ * débito da sua conta que pagou (as duas pontas ficam fora de entradas e gastos).
+ */
+function blocoFaturas(cls: Classificada[], mes: string) {
+  const contas = state.dados.contas;
+  const cartao = (id: string) => contas.find(c => c.id === id)?.tipo === 'cartao';
+  const porId = new Map(cls.map(x => [x.id, x]));
+  const doMes = cls.filter(x => x.t === 'fatura' && x.data.slice(0, 7) === mes);
+  const itens = doMes.filter(x => cartao(x.conta)).map(cc => {
+    const p = cc.par ? porId.get(cc.par) : undefined;
+    return `<button type="button" class="item" data-ir="tx/${esc(cc.id)}"><div class="name">${esc(nomeConta(cc.conta))}</div><div class="val">${brl(Math.abs(cc.valor))}</div>
+      <div class="meta">${p ? `Paga em ${fmtD(cc.data)} com ${esc(p.desc)} (${esc(nomeConta(p.conta))}, ${fmtD(p.data)})` : `Paga em ${fmtD(cc.data)}. O Pix ou débito que pagou não está no app.`}</div><div class="meta r"></div></button>`;
+  });
+  // Pagamento na conta sem o lançamento no cartão (ex.: fatura do cartão ainda não importada).
+  for (const x of doMes) if (!cartao(x.conta) && !(x.par && porId.has(x.par)) && x.valor < 0)
+    itens.push(`<button type="button" class="item" data-ir="tx/${esc(x.id)}"><div class="name">${esc(x.desc)}</div><div class="val">${brl(-x.valor)}</div>
+      <div class="meta">${esc(nomeConta(x.conta))}, ${fmtD(x.data)}. Sem o pagamento no cartão: importe a fatura para ligar os dois.</div><div class="meta r"></div></button>`);
+  if (!itens.length) return '';
+  return `<section class="panel"><h2>Faturas pagas</h2><div class="folha"><div class="list">${itens.join('')}</div></div>
+    <p class="note">O dinheiro que você manda para pagar a fatura e o pagamento no cartão são a mesma coisa: ficam fora de entradas e gastos, porque cada compra já contou no dia em que foi feita.</p></section>`;
 }
 
 export function telaCategoria(el: HTMLElement, cat: string) {

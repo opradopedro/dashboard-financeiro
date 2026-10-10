@@ -16,7 +16,7 @@ import { mudarMes, telaCategoria, telaFora, telaPainel, telaSemCategoria } from 
 import { telaTransacoes, telaTx } from './ui/transacoes';
 import { telaNotif, telaNotificacoes, telaSimular } from './ui/notificacoes';
 import { telaRegra, telaRegras } from './ui/regras';
-import { telaConferencia, telaImportar, telaRevisao } from './ui/importar';
+import { telaConferencia, telaImportar, telaRevisao, telaImportacao } from './ui/importar';
 import { telaApps, telaAjustes, telaBoasVindas, telaCategorias, telaConta, telaContas, telaDados } from './ui/ajustes';
 import { telaNovidades } from './ui/novidades';
 
@@ -37,6 +37,7 @@ const TELAS: Record<string, Tela> = {
   simular: { titulo: 'Simular notificação', render: el => telaSimular(el) },
   regras: { titulo: 'Regras', render: telaRegras, vivo: true },
   regra: { titulo: r => (r.params[0] === 'nova' ? 'Nova regra' : 'Editar regra'), render: (el, r) => telaRegra(el, r.params[0], r) },
+  importacao: { titulo: 'Arquivo importado', render: (el, r) => telaImportacao(el, r.params[0]), vivo: true },
   revisao: { titulo: 'Revisão', render: el => telaRevisao(el), vivo: true },
   conferencia: { titulo: 'Conferência mensal', render: telaConferencia, vivo: true },
   apps: { titulo: 'Apps monitorados', render: el => telaApps(el) },

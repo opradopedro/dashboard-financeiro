@@ -69,7 +69,8 @@ export function sanear(x: unknown): Dados {
     revisoes: arr(o.revisoes).filter(r => typeof r.id === 'string' && r.linha && typeof r.linha === 'object' && Array.isArray(r.candidatos))
       .map(r => {
         const l = r.linha as Obj;
-        return { id: str(r.id), linha: { conta: str(l.conta), data: str(l.data), desc: str(l.desc), valor: Number(l.valor) || 0, chave: str(l.chave) },
+        return { id: str(r.id), linha: { conta: str(l.conta), data: str(l.data), desc: str(l.desc), valor: Number(l.valor) || 0, chave: str(l.chave),
+          ...(typeof l.cat === 'string' && l.cat ? { cat: l.cat } : {}), ...(tipoOk(l.tipoUsuario) ? { tipoUsuario: l.tipoUsuario as Dados['txs'][0]['tipo'] } : {}) },
           candidatos: (r.candidatos as unknown[]).filter((c): c is string => typeof c === 'string'), arquivo: str(r.arquivo), em: str(r.em) };
       }).filter(r => ehData(r.linha.data) && r.linha.chave),
     importacoes: arr(o.importacoes).filter(i => typeof i.id === 'string')

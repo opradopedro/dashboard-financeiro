@@ -21,8 +21,9 @@ export function tipoAuto(desc: string, valor: number, cartao: boolean, titular =
   const t = norm(desc);
   if (!cartao && titular && ehTitular(desc, titular)) return 'interna';
   if (cartao) {
-    // No cartão: entrada é pagamento da fatura ou estorno (estorno desconta do gasto, por isso "saída" positiva).
-    if (valor > 0 && FATURA.test(t)) return 'fatura';
+    // No cartão: pagamento da fatura (qualquer sinal: há faturas que trazem as compras positivas)
+    // ou estorno (estorno desconta do gasto, por isso "saída" positiva).
+    if (FATURA.test(t)) return 'fatura';
     return 'saida';
   }
   if (CAIXINHA.test(t)) return 'caixinha';
@@ -55,6 +56,7 @@ export interface Classificada extends Transacao {
   t: TipoTx;          // tipo final
   c: string;          // categoria final ('' = sem categoria)
   auto: boolean;      // tipo decidido pelo app (sem escolha sua nem regra de categoria)
+  par?: string;       // a outra ponta: transferência entre contas suas, ou Pix/débito que pagou a fatura
 }
 
 export interface Contexto { contas: Conta[]; categorias: Categoria[]; regrasCat: RegraCat[]; titular?: string }
@@ -62,7 +64,7 @@ export interface Contexto { contas: Conta[]; categorias: Categoria[]; regrasCat:
 /**
  * Classifica todas as transações. Além do tipo de cada uma, junta pares: o mesmo valor saindo de
  * uma conta sua e entrando em outra conta sua em até 3 dias é transferência interna; o pagamento
- * da fatura na conta casa com o crédito no cartão (até 5 dias).
+ * da fatura no cartão casa com o Pix/débito de mesmo valor na conta (10 dias antes a 5 depois).
  */
 export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
   const tipoConta = new Map(ctx.contas.map(c => [c.id, c.tipo]));
@@ -88,14 +90,25 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
   for (const e of livres) {
     if (e.valor <= 0 || usados.has(e)) continue;
     const s = livres.find(x => !usados.has(x) && x.valor < 0 && x.conta !== e.conta && Math.abs(x.valor + e.valor) < 0.005 && diasEntre(x.data, e.data) <= 3);
-    if (s) { e.t = 'interna'; s.t = 'interna'; usados.add(e); usados.add(s); }
+    if (s) { e.t = 'interna'; s.t = 'interna'; e.par = s.id; s.par = e.id; usados.add(e); usados.add(s); }
   }
-  // Pagamento da fatura: débito na conta com o mesmo valor do crédito no cartão, em até 5 dias.
-  const creditosCartao = out.filter(x => tipoConta.get(x.conta) === 'cartao' && x.valor > 0 && x.t !== 'fatura' && x.auto && !x.tipo);
-  for (const cc of creditosCartao) {
-    const p = out.find(x => x.auto && !usados.has(x) && tipoConta.get(x.conta) !== 'cartao' && x.valor < 0
-      && (x.t === 'saida' || x.t === 'fatura') && Math.abs(x.valor + cc.valor) < 0.005 && diasEntre(x.data, cc.data) <= 5);
-    if (p) { p.t = 'fatura'; cc.t = 'fatura'; usados.add(p); usados.add(cc); }
+  // Pagamento da fatura: o pagamento que aparece no cartão casa com a saída da sua conta de mesmo
+  // valor (o Pix ou débito que você fez para pagar), de 10 dias antes até 5 dias depois.
+  // Os dois ficam fora de entradas e gastos: o gasto já contou em cada compra.
+  const ehCartao = (x: Classificada) => tipoConta.get(x.conta) === 'cartao';
+  const nomesBanco = new Map(ctx.contas.map(c => [c.id, norm(c.banco).trim()]));
+  const pagamentos = out.filter(x => ehCartao(x) && (x.t === 'fatura' || (x.valor > 0 && x.auto && !x.tipo))).sort((a, b) => a.data.localeCompare(b.data));
+  for (const cc of pagamentos) {
+    const v = Math.abs(cc.valor), banco = nomesBanco.get(cc.conta) || '';
+    const antes = (x: Classificada) => (Date.parse(cc.data) - Date.parse(x.data)) / 864e5;
+    const cands = out.filter(x => !usados.has(x) && !ehCartao(x) && x.valor < 0 && Math.abs(-x.valor - v) < 0.005
+      && antes(x) <= 10 && antes(x) >= -5 && (x.t === 'fatura' || (x.auto && (x.t === 'saida' || x.t === 'interna'))));
+    if (!cands.length) continue;
+    // Preferência: a que cita o banco do cartão ou "fatura"; depois, a mais perto da data.
+    const cita = (x: Classificada) => (banco && norm(x.desc).includes(` ${banco} `)) || / fatura /.test(norm(x.desc));
+    const p = cands.sort((a, b) => Number(cita(b)) - Number(cita(a)) || Math.abs(antes(a)) - Math.abs(antes(b)))[0];
+    p.t = 'fatura'; cc.t = 'fatura'; p.par = cc.id; cc.par = p.id;
+    usados.add(p); usados.add(cc);
   }
   return out;
 }

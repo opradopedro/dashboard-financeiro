@@ -3,7 +3,7 @@
 // - Linha de extrato que corresponde a uma transação de notificação/manual (mesma conta, mesmo
 //   valor, data próxima) é unida a ela: o extrato prevalece e a origem fica registrada.
 // - Casos duvidosos (mais de um candidato, ou data a 2–3 dias) vão para revisão.
-import type { Importacao, LinhaExtrato, Origem, Revisao, Transacao } from './tipos';
+import type { Importacao, LinhaExtrato, Origem, Revisao, TipoTx, Transacao } from './tipos';
 import { arred, diasEntre, norm, uid } from './util';
 
 /** Janela para considerar a mesma transação (dias). Até PERTO une sozinho; até LONGE pede revisão. */
@@ -55,14 +55,41 @@ export function candidatos(l: Pick<LinhaExtrato, 'conta' | 'data' | 'valor'>, tx
 const origemExtrato = (l: LinhaExtrato, arquivo: string, em: string): Origem =>
   ({ tipo: 'extrato', ref: l.chave, em, data: l.data, desc: l.desc, valor: l.valor, arquivo });
 
+/** Categoria e tipo escolhidos na pré-visualização. */
+const escolhas = (l: LinhaExtrato) => ({ ...(l.cat ? { cat: l.cat } : {}), ...(l.tipoUsuario ? { tipoUsuario: l.tipoUsuario } : {}) });
+
 /** Une a linha à transação: o extrato prevalece (data, descrição e valor) e a origem fica registrada. */
 export function unir(t: Transacao, l: LinhaExtrato, arquivo: string, em: string): Transacao {
-  return { ...t, data: l.data, desc: l.desc, valor: l.valor, origens: [...t.origens, origemExtrato(l, arquivo, em)] };
+  return { ...t, data: l.data, desc: l.desc, valor: l.valor, ...escolhas(l), origens: [...t.origens, origemExtrato(l, arquivo, em)] };
 }
 
 export function novaDeExtrato(l: LinhaExtrato, arquivo: string, em: string): Transacao {
-  return { id: uid('t'), conta: l.conta, data: l.data, desc: l.desc, valor: l.valor, origens: [origemExtrato(l, arquivo, em)], criadoEm: em };
+  return { id: uid('t'), conta: l.conta, data: l.data, desc: l.desc, valor: l.valor, ...escolhas(l), origens: [origemExtrato(l, arquivo, em)], criadoEm: em };
 }
+
+/** Mudanças feitas nas linhas antes de importar (pelo índice da linha no arquivo). */
+export interface Edicoes { excluir: number[]; inverter: number[]; cat: Record<number, string>; tipo: Record<number, TipoTx> }
+export const edicoesVazias = (): Edicoes => ({ excluir: [], inverter: [], cat: {}, tipo: {} });
+
+/**
+ * Aplica as mudanças da pré-visualização. A chave continua a da linha original, para que
+ * reimportar o mesmo arquivo reconheça a linha (inclusive invertida). Linhas tiradas viram
+ * "excluídas": reimportar não as traz de volta.
+ */
+export function aplicarEdicoes(ls: LinhaExtrato[], ed?: Edicoes): { linhas: LinhaExtrato[]; excluidas: string[] } {
+  if (!ed) return { linhas: ls, excluidas: [] };
+  const fora = new Set(ed.excluir), inv = new Set(ed.inverter);
+  const linhas: LinhaExtrato[] = [], excluidas: string[] = [];
+  ls.forEach((l, i) => {
+    if (fora.has(i)) { excluidas.push(l.chave); return; }
+    linhas.push({ ...l, valor: inv.has(i) ? -l.valor : l.valor, ...(ed.cat[i] ? { cat: ed.cat[i] } : {}), ...(ed.tipo[i] ? { tipoUsuario: ed.tipo[i] } : {}) });
+  });
+  return { linhas, excluidas };
+}
+
+/** Transações que vieram de uma importação (pela origem de extrato com o mesmo arquivo e horário). */
+export const txsDaImportacao = (txs: Transacao[], imp: Importacao) =>
+  txs.filter(t => t.origens.some(o => o.tipo === 'extrato' && o.em === imp.em && o.arquivo === imp.arquivo));
 
 export interface EstadoJuntar { txs: Transacao[]; revisoes: Revisao[]; excluidas: string[] }
 

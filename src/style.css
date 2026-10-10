@@ -258,3 +258,25 @@ dialog.folha-sel::backdrop{background:rgba(6,9,15,.62)}
 .legenda .traco{width:16px;height:0;border-radius:0;border-top:2.2px solid var(--saida)}
 .legenda .traco.ant{border-top:1.5px dashed var(--grafite)}
 .legenda .traco.proj{border-top:2px dotted var(--saida);opacity:.8}
+.folha-sel-titulo{flex:1;font-size:17px}
+.sel-op small{display:block;color:var(--grafite);font-size:12.5px;font-weight:450;margin-top:2px}
+
+/* ---------- linhas com seleção (importação) ---------- */
+.sel-barra{position:sticky;top:calc(62px + var(--sat));z-index:5;background:var(--lousa-alta);border-radius:var(--raio-p);padding:10px 12px;
+  display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 18px rgba(6,9,15,.35)}
+.sel-barra .check{align-items:center;font-weight:550}
+.sel-acoes{display:flex;gap:8px;flex-wrap:wrap}
+.sel-acoes::-webkit-scrollbar{display:none}
+.sel-acoes .btn{flex:none}
+.linhas-ed{display:flex;flex-direction:column}
+.linha-ed{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 4px;border-top:1px solid var(--linha);cursor:pointer}
+.linha-ed:first-child{border-top:0}
+.linha-ed input{width:20px;height:20px;min-height:0;margin:0;accent-color:var(--champanhe)}
+.linha-ed.marcada{background:linear-gradient(90deg,rgba(217,200,164,.08),transparent)}
+.le-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.le-desc{font-size:14.5px;font-weight:500;overflow-wrap:anywhere}
+.le-meta{font-size:12.5px;color:var(--grafite)}
+.le-tipo{font-weight:550;color:var(--champanhe)}
+.le-val{font-weight:500;white-space:nowrap;font-size:14.5px}
+.linha-ed.fora .le-val{color:var(--grafite)}
+.aviso-bloco{background:var(--alerta-fundo);border-radius:var(--raio-p);padding:12px 14px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5}

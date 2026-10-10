@@ -109,3 +109,26 @@ export function escolherCategoria(atual: string, op: Opcoes = {}): Promise<strin
     listaEl.querySelector('.atual')?.scrollIntoView({ block: 'center' });
   });
 }
+
+/** Folha com uma lista curta de opções (sem busca). Devolve o valor escolhido ou null. */
+export function escolherOpcao(titulo: string, opcoes: { v: string; t: string; nota?: string }[]): Promise<string | null> {
+  return new Promise(resolve => {
+    let escolhido: string | null = null;
+    const dlg = document.createElement('dialog');
+    dlg.className = 'folha-sel';
+    dlg.setAttribute('aria-label', titulo);
+    dlg.innerHTML = `<div class="folha-sel-cab"><h2 class="folha-sel-titulo">${esc(titulo)}</h2><button type="button" class="btn small" id="selFechar">Fechar</button></div>
+      <div class="folha-sel-lista">${opcoes.map(o => `<button type="button" class="sel-op" data-v="${esc(o.v)}"><span>${esc(o.t)}${o.nota ? `<small>${esc(o.nota)}</small>` : ''}</span></button>`).join('')}</div>`;
+    document.body.appendChild(dlg);
+    dlg.querySelector<HTMLElement>('.folha-sel-lista')!.onclick = e => {
+      const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+      if (!b) return;
+      escolhido = b.dataset.v ?? null;
+      dlg.close();
+    };
+    (dlg.querySelector('#selFechar') as HTMLButtonElement).onclick = () => dlg.close();
+    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+    dlg.addEventListener('close', () => { dlg.remove(); resolve(escolhido); });
+    dlg.showModal();
+  });
+}

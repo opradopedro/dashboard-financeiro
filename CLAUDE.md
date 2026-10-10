@@ -103,12 +103,18 @@ Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INI
 - `tipo` (da regra de notificação), `tipoUsuario` e `cat` (escolhas manuais) ficam na transação;
   o tipo/categoria **final** é calculado em `classificar()` (nunca gravado):
   `tipoUsuario` > regra de categoria > `tipo` da regra de notificação > `tipoAuto()` pela descrição.
-  Depois junta pares (Pix entre contas suas = interna; débito na conta + crédito no cartão = fatura).
+  Depois junta pares, com `par` apontando a outra ponta: Pix entre contas suas = interna (±3 dias);
+  pagamento no cartão (FATURA em qualquer sinal, ou crédito sem explicação) + saída da conta de
+  mesmo valor, de 10 dias antes a 5 depois = fatura (prefere a que cita o banco do cartão).
 - Categoria: `cat` > regra de categoria > palavras-chave (trecho mais longo vence; entrada só em
   categoria de receita) > sem categoria (`''`, exibido “Sem categoria”).
 - Painel conta só `entrada` e `saida`. Estorno no cartão = `saida` com valor positivo.
 
 ### Extratos e deduplicação (`juntar.ts`)
+- Pré-visualização: `Edicoes` por índice da linha (excluir/inverter/cat/tipo); `aplicarEdicoes` mantém a
+  chave da linha original e manda as tiradas para `excluidas`. `txsDaImportacao` acha as transações de
+  um arquivo (origem extrato com mesmo `em` e arquivo). Em cartão, o sinal é orientado sozinho
+  (maioria positiva = trocado), mesmo com modelo salvo.
 - Importação aceita vários arquivos: `detectarFonte` (modelo salvo > cabeçalho/PDF/OFX > nome do
   arquivo) e `contaDaFonte` (mesmo banco e tipo) escolhem a conta; em lote o modelo é sempre salvo.
 - Chave de linha: `id:<conta>:<FITID ou id>` ou `<conta>|<data>|<valor>|<desc normalizada>|<ordem>`.

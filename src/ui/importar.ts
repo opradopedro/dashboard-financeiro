@@ -1,10 +1,10 @@
 // Importação de extratos (PDF, CSV, Excel, OFX e finai-banco/1), um ou vários arquivos de uma vez,
 // com a instituição reconhecida pelo formato; revisão de casos duvidosos e conferência mensal.
-import { mudar, nomeConta, state } from '../app';
-import { chavesDasLinhas, conferencia, importarLinhas, resolverRevisao, saldoMaisRecente, type LinhaBruta } from '../core/juntar';
+import { classificadas, classificarAvulsas, editarTxs, excluirTxs, mudar, nomeConta, state } from '../app';
+import { aplicarEdicoes, chavesDasLinhas, conferencia, edicoesVazias, importarLinhas, resolverRevisao, saldoMaisRecente, txsDaImportacao, type Edicoes, type LinhaBruta } from '../core/juntar';
 import { itensPdf, lerExtratoPdf, type ExtratoPdf } from '../importar/pdf';
 import { lerFinai, linhasFinai, type LidoFinai } from '../core/finai';
-import type { Conta, Importacao, Mapeamento } from '../core/tipos';
+import type { Conta, Importacao, Mapeamento, LinhaExtrato, Transacao } from '../core/tipos';
 import { hoje, slug, somaMes, uid } from '../core/util';
 import { lerCsv } from '../importar/csv';
 import { contaDaFonte, detectarFonte, type ArquivoLido, type Fonte } from '../importar/detectar';
@@ -13,6 +13,7 @@ import { lerOfx, type Ofx } from '../importar/ofx';
 import { lerPlanilha, type Celula } from '../importar/planilha';
 import { decodificar } from '../importar/texto';
 import { $, brl, esc, fmtD, fmtQuando, mesLongo, opcoes, sinal, toast } from './fmt';
+import { editorLinhas, resumoLinhas, type LinhaVis } from './linhas';
 import { linhaTx } from './transacoes';
 import { trocar, type Rota } from './nav';
 
@@ -34,6 +35,8 @@ interface Sessao {
   destino?: Record<string, string>; // conta do arquivo → conta do app ('' = criar)
   erro?: string;
   resultado?: Importacao[];
+  ed?: Edicoes;             // mudanças nas linhas antes de importar
+  sel?: Set<string>;        // linhas marcadas na pré-visualização
 }
 /** Arquivos escolhidos (um ou vários), o aberto em detalhe (-1 = lista) e o resumo final. */
 let lote: Sessao[] = [];
@@ -53,10 +56,10 @@ export function telaImportar(el: HTMLElement) {
       <button type="button" class="btn" data-ir="conferencia">Conferir mês</button></div>
   </section>
   <div id="iPasso"></div>
-  <section class="panel"><h2>Já importados</h2><div class="folha"><div class="list">${[...d.importacoes].reverse().slice(0, 30).map(i => `<div class="item">
+  <section class="panel"><h2>Já importados</h2><p class="note">Toque num arquivo para ver as linhas e mudar várias de uma vez.</p><div class="folha"><div class="list">${[...d.importacoes].reverse().slice(0, 30).map(i => `<button type="button" class="item" data-ir="importacao/${esc(i.id)}">
     <div class="name">${esc(i.arquivo)}</div><div class="val sub">${fmtQuando(Date.parse(i.em))}</div>
     <div class="meta">${esc(nomeConta(i.conta))}, de ${fmtD(i.de)} a ${fmtD(i.ate)}</div>
-    <div class="meta r">${i.novas} novas, ${i.unidas} unidas${i.revisao ? `, ${i.revisao} em revisão` : ''}${i.repetidas ? `, ${i.repetidas} repetidas` : ''}</div></div>`).join('') || '<div class="empty">Nenhum arquivo importado ainda.</div>'}</div></div></section>`;
+    <div class="meta r">${resumoImp([i])}</div></button>`).join('') || '<div class="empty">Nenhum arquivo importado ainda.</div>'}</div></div></section>`;
 
   ($('#iArq') as HTMLInputElement).onchange = async e => {
     const inp = e.target as HTMLInputElement;
@@ -126,19 +129,19 @@ async function ler(f: File, s: Sessao): Promise<ArquivoLido | null> {
   return { nome: f.name, rows: s.rows };
 }
 
-/** Usa o modelo salvo da conta (mesmo cabeçalho) ou sugere o mapeamento. */
+/** Fatura de cartão: a maioria das linhas são compras. Se vierem positivas, o sinal está trocado. */
+const sinalTrocado = (l: LinhaBruta[]) => l.length > 0 && l.filter(x => x.valor > 0).length / l.length > 0.6;
+
+/** Usa o modelo salvo da conta (mesmo cabeçalho) ou sugere o mapeamento; em cartão, acerta o sinal. */
 function aplicarModelo(s: Sessao) {
+  const cartao = state.dados.contas.find(c => c.id === s.conta)?.tipo === 'cartao';
+  if (s.tipo === 'ofx' && s.ofx) { s.inverter = cartao && sinalTrocado(s.ofx.linhas); return; }
   if (s.tipo !== 'tabela' || !s.rows) return;
   s.modelo = undefined;
   const md = s.conta ? modeloPara(state.dados.modelos, s.conta, s.rows) : null;
-  if (md) { s.map = { ...md }; s.modelo = md.id; return; }
-  s.map = sugerirMapeamento(s.rows);
-  // Fatura de cartão costuma trazer as compras positivas: se a maioria for positiva, inverte.
-  const conta = state.dados.contas.find(c => c.id === s.conta);
-  if (conta?.tipo === 'cartao') {
-    const l = aplicarMapeamento(s.rows, s.map).linhas;
-    if (l.length && l.filter(x => x.valor > 0).length / l.length > 0.6) s.map.inverter = true;
-  }
+  if (md) { s.map = { ...md }; s.modelo = md.id; } else s.map = sugerirMapeamento(s.rows);
+  // Vale até com modelo salvo: um modelo gravado com o sinal errado não estraga as próximas faturas.
+  if (cartao) s.map.inverter = sinalTrocado(aplicarMapeamento(s.rows, { ...s.map, inverter: false }).linhas);
 }
 
 /** Linhas prontas para importar (tabela com o mapeamento, OFX com a inversão, PDF como veio). */
@@ -251,7 +254,7 @@ function passoLote(el: HTMLElement) {
       for (const s of lote.filter(pronta)) {
         if (s.tipo === 'finai') s.resultado = await importarFinai(s);
         else {
-          s.resultado = [await importar(s.conta, linhasDe(s), s.arquivo)];
+          s.resultado = [await importar(s.conta, linhasDe(s), s.arquivo, s.ed)];
           if (s.tipo === 'tabela') await salvarModelo(s);
         }
       }
@@ -299,12 +302,50 @@ function ligarCabecalho(el: HTMLElement, s: Sessao) {
 const botaoImportar = (s: Sessao, n: number) => `<button type="button" class="btn primary" id="btnImp"${n && s.conta ? '' : ' disabled'}>${s.conta ? `Importar ${n} linhas em ${esc(nomeConta(s.conta))}` : 'Escolha a conta para importar'}</button>`;
 const botaoCancelar = () => `<button type="button" class="btn" id="btnCancelar">${lote.length > 1 ? 'Voltar' : 'Cancelar'}</button>`;
 
-function previa(linhas: LinhaBruta[], extra = '') {
-  return `<div class="tabela"><table><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>
-    ${linhas.slice(0, 12).map(l => `<tr><td>${fmtD(l.data)}</td><td class="desc">${esc(l.desc)}</td><td class="${l.valor > 0 ? 'up' : ''}">${sinal(l.valor)}</td></tr>`).join('')}
-  </tbody></table></div>
-  <p class="sub">${linhas.length === 1 ? '1 linha' : `${linhas.length} linhas`}${linhas.length > 12 ? ' (mostrando 12)' : ''}: entradas ${brl(linhas.filter(l => l.valor > 0).reduce((a, l) => a + l.valor, 0))}, saídas ${brl(-linhas.filter(l => l.valor < 0).reduce((a, l) => a + l.valor, 0))}${extra}.${(() => { const sd = saldoMaisRecente(linhas); return sd ? ` Saldo em ${fmtD(sd.data)}: ${brl(sd.valor)}.` : ''; })()}</p>`;
+/** Linhas como vão entrar: sem as tiradas, com as mudanças e o tipo/categoria que o app vai dar. */
+function visao(s: Sessao): { ls: LinhaVis[]; brutas: LinhaBruta[] } {
+  const brutas = linhasDe(s);
+  const ed = s.ed || edicoesVazias();
+  const fora = new Set(ed.excluir), inv = new Set(ed.inverter);
+  const txs: Transacao[] = [];
+  brutas.forEach((l, i) => {
+    if (fora.has(i)) return;
+    txs.push({ id: String(i), conta: s.conta, data: l.data, desc: l.desc, valor: inv.has(i) ? -l.valor : l.valor, origens: [], criadoEm: '',
+      ...(ed.cat[i] ? { cat: ed.cat[i] } : {}), ...(ed.tipo[i] ? { tipoUsuario: ed.tipo[i] } : {}) });
+  });
+  const ls = classificarAvulsas(txs).map(x => ({ id: x.id, data: x.data, desc: x.desc, valor: x.valor, t: x.t, c: x.c }));
+  return { ls, brutas };
 }
+
+/** Pré-visualização: lista com seleção e mudanças rápidas; resumo do que conta. */
+function blocoLinhas(s: Sessao, extra = '') {
+  const { ls, brutas } = visao(s);
+  const tiradas = s.ed?.excluir.length || 0;
+  const sd = saldoMaisRecente(brutas);
+  return `<h3>Linhas</h3>
+    <p class="sub">${resumoLinhas(ls)}${extra}${sd ? ` Saldo em ${fmtD(sd.data)}: ${brl(sd.valor)}.` : ''}</p>
+    ${tiradas ? `<div class="row"><span class="sub">${tiradas === 1 ? '1 linha não vai' : `${tiradas} linhas não vão`} ser importada${tiradas === 1 ? '' : 's'}.</span><button type="button" class="btn small" id="btnDesfazer">Trazer de volta</button></div>` : ''}
+    <div id="iLinhas"></div>`;
+}
+
+function ligarLinhas(el: HTMLElement, s: Sessao) {
+  const box = el.querySelector<HTMLElement>('#iLinhas');
+  if (!box) return;
+  s.sel ||= new Set();
+  const ed = () => (s.ed ||= edicoesVazias());
+  const idx = (ids: string[]) => ids.map(Number);
+  editorLinhas(box, visao(s).ls, s.sel, {
+    rotuloExcluir: 'Não importar',
+    categoria: async (ids, c) => { for (const i of idx(ids)) { if (c) ed().cat[i] = c; else delete ed().cat[i]; } passo(); },
+    tipo: async (ids, t) => { for (const i of idx(ids)) ed().tipo[i] = t; passo(); },
+    inverter: async ids => { const e = ed(); for (const i of idx(ids)) e.inverter = e.inverter.includes(i) ? e.inverter.filter(x => x !== i) : [...e.inverter, i]; passo(); },
+    excluir: async ids => { ed().excluir.push(...idx(ids)); s.sel!.clear(); passo(); },
+  });
+  el.querySelector('#btnDesfazer')?.addEventListener('click', () => { ed().excluir = []; passo(); });
+}
+
+/** Linhas que vão ser importadas (para o botão). */
+const nImportar = (s: Sessao) => linhasDe(s).length - (s.ed?.excluir.length || 0);
 
 function passoTabela(el: HTMLElement, s: Sessao) {
   const rows = s.rows!, m = s.map!;
@@ -331,13 +372,13 @@ function passoTabela(el: HTMLElement, s: Sessao) {
       <label class="check full"><input type="checkbox" id="mInv"${m.inverter ? ' checked' : ''}> Inverter sinal (no arquivo, gasto aparece positivo — comum em fatura de cartão)</label>
       ${lote.length > 1 ? '' : '<label class="check full"><input type="checkbox" id="mSalvar" checked> Salvar como modelo desta conta</label>'}
     </form>
-    <h3>Pré-visualização</h3>
-    ${previa(conv.linhas, conv.ignoradas.length ? `; ${conv.ignoradas.length} ignoradas` : '')}
+    ${blocoLinhas(s, conv.ignoradas.length ? ` ${conv.ignoradas.length === 1 ? '1 linha do arquivo foi ignorada' : `${conv.ignoradas.length} linhas do arquivo foram ignoradas`} (sem data ou valor).` : '')}
     ${conv.ignoradas.length ? `<details class="como"><summary>Linhas ignoradas</summary><p>${conv.ignoradas.slice(0, 40).map(i => `linha ${i.linha}: ${i.motivo}`).join('<br>')}</p></details>` : ''}
-    <div class="row">${botaoImportar(s, conv.linhas.length)}${botaoCancelar()}</div>
+    <div class="row">${botaoImportar(s, nImportar(s))}${botaoCancelar()}</div>
   </section>`;
+  ligarLinhas(el, s);
   const num = (id: string) => Number(($(id) as HTMLSelectElement | null)?.value ?? -1);
-  const atualizar = () => {
+  const atualizar = (e: Event) => {
     const novaCab = num('#mCab');
     if (novaCab !== m.linhaCab) { // mudou o cabeçalho: refaz a sugestão a partir dele
       const sug = sugerirMapeamento(rows.slice(novaCab < 0 ? 0 : novaCab));
@@ -347,15 +388,17 @@ function passoTabela(el: HTMLElement, s: Sessao) {
         colCredito: num('#mCred'), colDebito: num('#mDeb'), colSaldo: num('#mSaldo'), formatoData: ($('#mFmt') as HTMLSelectElement).value, inverter: ($('#mInv') as HTMLInputElement).checked });
     }
     s.modelo = undefined;
+    // Colunas mudaram: as linhas podem ser outras, então as mudanças feitas nelas são descartadas.
+    if (!(e.target as HTMLElement).matches('#mInv')) { s.ed = undefined; s.sel = undefined; }
     passo();
   };
   el.querySelectorAll('#fMap select:not(#mAba), #mInv').forEach(x => x.addEventListener('change', atualizar));
-  $('#mAba')?.addEventListener('change', () => { s.aba = ($('#mAba') as HTMLSelectElement).value; s.rows = s.lerAba!(s.aba); aplicarModelo(s); passo(); });
+  $('#mAba')?.addEventListener('change', () => { s.aba = ($('#mAba') as HTMLSelectElement).value; s.rows = s.lerAba!(s.aba); s.ed = undefined; s.sel = undefined; aplicarModelo(s); passo(); });
   ligarCabecalho(el, s);
   $('#btnImp').onclick = async () => {
     // Num lote, o modelo é sempre salvo (é ele que faz o app reconhecer o arquivo da próxima vez).
     const salvar = ($('#mSalvar') as HTMLInputElement | null)?.checked ?? true;
-    s.resultado = [await importar(s.conta, conv.linhas, s.arquivo)];
+    s.resultado = [await importar(s.conta, conv.linhas, s.arquivo, s.ed)];
     if (salvar) await salvarModelo(s);
     terminouUm();
   };
@@ -378,12 +421,13 @@ function passoOfx(el: HTMLElement, s: Sessao) {
     ${cabecalho(s)}
     <p class="sub">OFX ${o.cartao ? 'de cartão' : 'de conta'}${o.banco ? `, banco ${esc(o.banco)}` : ''}${o.contaId ? `, conta ${esc(o.contaId)}` : ''}.</p>
     <label class="check"><input type="checkbox" id="oInv"${s.inverter ? ' checked' : ''}> Inverter sinal</label>
-    ${previa(linhas)}
-    <div class="row">${botaoImportar(s, linhas.length)}${botaoCancelar()}</div>
+    ${blocoLinhas(s)}
+    <div class="row">${botaoImportar(s, nImportar(s))}${botaoCancelar()}</div>
   </section>`;
   $('#oInv').onchange = () => { s.inverter = ($('#oInv') as HTMLInputElement).checked; passo(); };
   ligarCabecalho(el, s);
-  $('#btnImp').onclick = async () => { s.resultado = [await importar(s.conta, linhas, s.arquivo)]; terminouUm(); };
+  ligarLinhas(el, s);
+  $('#btnImp').onclick = async () => { s.resultado = [await importar(s.conta, linhas, s.arquivo, s.ed)]; terminouUm(); };
 }
 
 function passoPdf(el: HTMLElement, s: Sessao) {
@@ -391,11 +435,12 @@ function passoPdf(el: HTMLElement, s: Sessao) {
   el.innerHTML = `<section class="caixa">
     ${cabecalho(s)}
     <p class="sub">Extrato em PDF${p.banco ? ` do ${esc(p.banco)}` : ''}. Cada movimento tem número de operação, então importar de novo não duplica.</p>
-    ${previa(p.linhas)}
-    <div class="row">${botaoImportar(s, p.linhas.length)}${botaoCancelar()}</div>
+    ${blocoLinhas(s)}
+    <div class="row">${botaoImportar(s, nImportar(s))}${botaoCancelar()}</div>
   </section>`;
   ligarCabecalho(el, s);
-  $('#btnImp').onclick = async () => { s.resultado = [await importar(s.conta, p.linhas, s.arquivo)]; terminouUm(); };
+  ligarLinhas(el, s);
+  $('#btnImp').onclick = async () => { s.resultado = [await importar(s.conta, p.linhas, s.arquivo, s.ed)]; terminouUm(); };
 }
 
 function passoFinai(el: HTMLElement, s: Sessao) {
@@ -432,19 +477,24 @@ async function importarFinai(s: Sessao): Promise<Importacao[]> {
   return res;
 }
 
-async function importarLinhasConta(conta: string, linhas: ReturnType<typeof chavesDasLinhas>, arquivo: string): Promise<Importacao> {
+async function importarLinhasConta(conta: string, linhas: LinhaExtrato[], arquivo: string, tiradas: string[] = []): Promise<Importacao> {
   let imp!: Importacao;
   await mudar(d => {
-    const r = importarLinhas(d, linhas, arquivo);
+    const excluidas = tiradas.length ? [...new Set([...d.excluidas, ...tiradas])] : d.excluidas;
+    const r = importarLinhas({ ...d, excluidas }, linhas, arquivo);
     imp = { ...r.importacao, conta };
-    return { ...d, txs: r.txs, revisoes: r.revisoes, importacoes: [...d.importacoes, imp].slice(-200) };
+    return { ...d, txs: r.txs, revisoes: r.revisoes, excluidas, importacoes: [...d.importacoes, imp].slice(-200) };
   });
   return imp;
 }
 
-/** Importa as linhas e, se o arquivo traz saldo, atualiza o saldo da conta (quando é mais novo que o guardado). */
-async function importar(conta: string, l: LinhaBruta[], arquivo: string) {
-  const imp = await importarLinhasConta(conta, chavesDasLinhas(conta, l), arquivo);
+/**
+ * Importa as linhas (com as mudanças da pré-visualização) e, se o arquivo traz saldo, atualiza o
+ * saldo da conta (quando é mais novo que o guardado).
+ */
+async function importar(conta: string, l: LinhaBruta[], arquivo: string, ed?: Edicoes) {
+  const r = aplicarEdicoes(chavesDasLinhas(conta, l), ed);
+  const imp = await importarLinhasConta(conta, r.linhas, arquivo, r.excluidas);
   const sd = saldoMaisRecente(l);
   if (sd) await mudar(d => ({ ...d, contas: d.contas.map(c => (c.id === conta && (!c.saldoRef || c.saldoRef.data <= sd.data) ? { ...c, saldoRef: sd } : c)) }));
   return imp;
@@ -475,6 +525,45 @@ function painelResultado(ss: Sessao[]) {
       <button type="button" class="btn" data-ir="conferencia?conta=${encodeURIComponent(rs[0]?.conta || '')}&mes=${(rs[0]?.ate || hoje()).slice(0, 7)}">Conferência</button>
       <button type="button" class="btn" id="btnNovoArq">Importar outros</button></div>
   </section>`;
+}
+
+// ---------- Um arquivo já importado ----------
+
+let selImp: { id: string; sel: Set<string> } = { id: '', sel: new Set() };
+
+export function telaImportacao(el: HTMLElement, id: string) {
+  const d = state.dados;
+  const imp = d.importacoes.find(i => i.id === id);
+  if (!imp) { el.innerHTML = '<div class="panel"><div class="empty">Importação não encontrada.</div></div>'; return; }
+  if (selImp.id !== id) selImp = { id, sel: new Set() };
+  const ids = new Set(txsDaImportacao(d.txs, imp).map(t => t.id));
+  const minhas = classificadas().filter(x => ids.has(x.id)).sort((a, b) => b.data.localeCompare(a.data));
+  const revs = d.revisoes.filter(r => r.em === imp.em && r.arquivo === imp.arquivo);
+  const cartao = d.contas.find(c => c.id === imp.conta)?.tipo === 'cartao';
+  const trocado = cartao && sinalTrocado(minhas);
+  const vis: LinhaVis[] = minhas.map(x => ({ id: x.id, data: x.data, desc: x.desc, valor: x.valor, t: x.t, c: x.c,
+    ...(x.origens.some(o => o.tipo !== 'extrato') ? { nota: 'unida a notificação ou lançamento' } : {}) }));
+  el.innerHTML = `<section class="caixa">
+      <h2>${esc(imp.arquivo)}</h2>
+      <p class="sub">${esc(nomeConta(imp.conta))}, de ${fmtD(imp.de)} a ${fmtD(imp.ate)}. Importado em ${fmtQuando(Date.parse(imp.em))}: ${resumoImp([imp])}.</p>
+      ${trocado ? `<div class="aviso-bloco"><p>As compras deste cartão estão positivas, como entrada: o sinal do arquivo parece trocado.</p>
+        <button type="button" class="btn small primary" id="btnInvTudo">Inverter o sinal de todas</button></div>` : ''}
+      ${revs.length ? `<button type="button" class="aviso" data-ir="revisao">${revs.length === 1 ? '1 linha deste arquivo espera' : `${revs.length} linhas deste arquivo esperam`} revisão</button>` : ''}
+    </section>
+    <section class="panel">
+      <p class="sub">${minhas.length ? resumoLinhas(vis) : 'Nenhuma transação deste arquivo continua no app (todas repetidas, em revisão ou excluídas).'}</p>
+      <div id="impLinhas"></div>
+    </section>`;
+  if (minhas.length) editorLinhas(el.querySelector<HTMLElement>('#impLinhas')!, vis, selImp.sel, {
+    categoria: async (sel, c) => { await editarTxs(sel, t => { const n = { ...t }; if (c) n.cat = c; else delete n.cat; return n; }); toast('Categoria mudada.'); },
+    tipo: async (sel, tp) => { await editarTxs(sel, t => ({ ...t, tipoUsuario: tp })); toast('Tipo mudado.'); },
+    inverter: async sel => { await editarTxs(sel, t => ({ ...t, valor: -t.valor })); toast('Sinal invertido.'); },
+    excluir: async sel => { await excluirTxs(sel); toast(sel.length === 1 ? 'Excluída. Reimportar o arquivo não a traz de volta.' : 'Excluídas. Reimportar o arquivo não as traz de volta.'); },
+  });
+  el.querySelector('#btnInvTudo')?.addEventListener('click', async () => {
+    await editarTxs([...ids], t => ({ ...t, valor: -t.valor }));
+    toast('Sinal invertido em todas.');
+  });
 }
 
 // ---------- Revisão ----------

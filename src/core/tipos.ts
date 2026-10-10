@@ -144,7 +144,11 @@ export interface Mapeamento {
 export interface ModeloImport extends Mapeamento { id: string; conta: string; nome: string; assinatura: string }
 
 /** Uma linha de extrato já normalizada. */
-export interface LinhaExtrato { conta: string; data: string; desc: string; valor: number; chave: string }
+export interface LinhaExtrato {
+  conta: string; data: string; desc: string; valor: number; chave: string;
+  /** Escolhidos na pré-visualização da importação: passam para a transação. */
+  cat?: string; tipoUsuario?: TipoTx;
+}
 
 /** Linha de extrato que pode ser a mesma de uma transação existente: você decide. */
 export interface Revisao { id: string; linha: LinhaExtrato; candidatos: string[]; arquivo: string; em: string }

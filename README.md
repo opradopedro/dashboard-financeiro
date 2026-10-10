@@ -115,6 +115,12 @@ sem conta no app (ex.: OFX do Itaú) ganha um botão **Criar conta**. Arquivo n�
 conta. **Ver colunas** abre o arquivo para conferir; **Importar N arquivos** importa todos e mostra o
 resultado de cada um. Com um arquivo só, ele abre direto para conferir.
 
+**Linhas:** antes de importar, a lista mostra como cada linha vai entrar (categoria, ou “Pagamento
+de fatura”, “Caixinha”…). Toque para marcar linhas (ou **Marcar todas**) e use **Categoria**,
+**Tipo**, **Inverter sinal** ou **Não importar** (linha tirada não volta ao reimportar o arquivo).
+Em **Já importados**, toque num arquivo para ver as transações que vieram dele e fazer o mesmo
+com elas depois (inclusive excluir).
+
 Formatos conferidos com arquivos reais:
 
 | Arquivo | Conta | Observação |
@@ -123,6 +129,9 @@ Formatos conferidos com arquivos reais:
 | Fatura Rico (CSV `Data;Estabelecimento;Portador;Valor;Parcela`) | Rico crédito | parcela entra na descrição (“LOJA - 2 de 3”) |
 | Fatura Nubank (CSV `date,title,amount`) | Nubank crédito | compras positivas: o sinal é invertido sozinho |
 | Extrato Flash (CSV com Saldo) | Flash alimentação | o saldo do arquivo atualiza o saldo da conta |
+
+**Fatura de cartão com sinal trocado** (compras positivas, como na Rico): o app inverte sozinho,
+mesmo com modelo salvo. Se um arquivo já entrou assim, a tela dele oferece **Inverter o sinal de todas**.
 
 Quando o arquivo traz **saldo** (PDF do Mercado Pago, Flash), o saldo da conta é atualizado com o
 do movimento mais recente.
@@ -135,6 +144,14 @@ do movimento mais recente.
   (mais de um candidato, ou 2–3 dias de diferença), a linha vai para **Revisão**.
 - **Conferência mensal** (por conta): o que bateu, o que só está no extrato e o que só veio por
   notificação/manual.
+
+### Fatura do cartão
+Pagamento de fatura não é gasto nem entrada: cada compra já contou no dia em que foi feita. O
+pagamento que aparece no cartão (“Pagamento recebido”, “Pagamento de fatura”) é ligado ao Pix ou
+débito da sua conta que pagou: **mesmo valor, de 10 dias antes a 5 dias depois** (com dois
+candidatos, vence o que cita o banco do cartão ou “fatura”, depois o mais perto da data). Os dois
+ficam como “Pagamento de fatura”. O Painel mostra **Faturas pagas** no mês (cartão, valor, data e o
+Pix que pagou) e a transação mostra a outra ponta.
 
 ### Categorias
 Categorização automática por palavras-chave (editáveis em Ajustes → Categorias; vence o trecho mais

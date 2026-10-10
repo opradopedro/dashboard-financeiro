@@ -24,6 +24,12 @@ export function classificadas(): Classificada[] {
   return cache.cls;
 }
 
+/** Classifica transações que ainda não foram gravadas (ex.: linhas na pré-visualização da importação). */
+export function classificarAvulsas(txs: Transacao[]): Classificada[] {
+  const d = state.dados;
+  return classificar(txs, { contas: d.contas, categorias: d.categorias, regrasCat: d.regrasCat, titular: d.config.titular });
+}
+
 const ouvintes = new Set<() => void>();
 export const aoMudar = (f: () => void) => ouvintes.add(f);
 
@@ -131,6 +137,19 @@ export function excluirTx(id: string) {
     return { ...d, txs: d.txs.filter(x => x.id !== id), excluidas: [...d.excluidas, ...chavesParaExcluidas(t)],
       revisoes: d.revisoes.map(r => ({ ...r, candidatos: r.candidatos.filter(c => c !== id) })) };
   });
+}
+
+/** Exclui várias transações de uma vez (as linhas de extrato delas não voltam ao reimportar). */
+export function excluirTxs(ids: string[]) {
+  const fora = new Set(ids);
+  return mudar(d => ({ ...d, txs: d.txs.filter(x => !fora.has(x.id)), excluidas: [...d.excluidas, ...d.txs.filter(x => fora.has(x.id)).flatMap(chavesParaExcluidas)],
+    revisoes: d.revisoes.map(r => ({ ...r, candidatos: r.candidatos.filter(c => !fora.has(c)) })) }));
+}
+
+/** Muda várias transações de uma vez. */
+export function editarTxs(ids: string[], f: (t: Transacao) => Transacao) {
+  const alvo = new Set(ids);
+  return mudar(d => ({ ...d, txs: d.txs.map(x => (alvo.has(x.id) ? f(x) : x)) }));
 }
 
 export function salvarTx(t: Transacao) {

@@ -94,3 +94,40 @@ describe('saldo estimado', () => {
     expect(saldoEstimado(txs, contas[0])).toBeNull();
   });
 });
+
+describe('pagamento da fatura ligado ao Pix que pagou', () => {
+  const cs: Conta[] = [...contas, { id: 'rico', nome: 'Rico crédito', banco: 'Rico', tipo: 'cartao', ativa: true }];
+  const c = { ...ctx, contas: cs };
+  it('Pix da conta dias antes, mesmo valor, vira pagamento de fatura e fica ligado ao pagamento no cartão', () => {
+    const ts = [
+      tx('mp', '2026-08-25', 'Pix enviado Fulano de Tal', -586.65),
+      tx('rico', '2026-08-31', 'Pagamento de fatura', 586.65),
+      tx('rico', '2026-08-20', 'FARMACIA', -34.89),
+      tx('mp', '2026-08-30', 'Pix enviado Beltrano', -586.65), // mesmo valor, mais perto do pagamento
+    ];
+    const cls = classificar(ts, c);
+    const [pix, pag, , outro] = cls;
+    // O mais perto da data é o de 30/08; os dois têm o mesmo valor, nenhum cita o banco.
+    expect(outro.t).toBe('fatura');
+    expect(outro.par).toBe(pag.id);
+    expect(pag.par).toBe(outro.id);
+    expect(pix.t).toBe('saida');
+    expect(resumoMes(cls, '2026-08').saidas).toBeCloseTo(586.65 + 34.89);
+  });
+  it('prefere o Pix que cita o banco do cartão; pagamento com sinal trocado também casa', () => {
+    const ts = [
+      tx('mp', '2026-08-25', 'Pix enviado Rico Corretora', -586.65),
+      tx('mp', '2026-08-30', 'Pix enviado Beltrano', -586.65),
+      tx('rico', '2026-08-31', 'Pagamento de fatura', -586.65),
+    ];
+    const cls = classificar(ts, c);
+    expect(cls.map(x => x.t)).toEqual(['fatura', 'saida', 'fatura']);
+    expect(cls[0].par).toBe(cls[2].id);
+  });
+  it('fora da janela ou valor diferente: não liga', () => {
+    const ts = [tx('mp', '2026-08-01', 'Pix enviado X', -586.65), tx('mp', '2026-08-28', 'Pix enviado Y', -500), tx('rico', '2026-08-31', 'Pagamento de fatura', 586.65)];
+    const cls = classificar(ts, c);
+    expect(cls.map(x => x.t)).toEqual(['saida', 'saida', 'fatura']);
+    expect(cls[2].par).toBeUndefined();
+  });
+});

@@ -1,5 +1,9 @@
 {
   "proxima": [
+    "Arquivos já importados: toque para ver as linhas; marque algumas (ou todas) e mude categoria ou tipo, inverta o sinal ou exclua de uma vez.",
+    "Na importação, a lista de linhas tem as mesmas ações antes de importar, mostra como cada linha vai entrar (ex.: pagamento de fatura) e o resumo não soma pagamento de fatura como entrada.",
+    "Fatura de cartão com o sinal trocado (compras positivas, como na Rico) é acertada sozinha, mesmo com modelo salvo; arquivo já importado assim mostra um botão para inverter tudo.",
+    "O Pix ou débito que você manda para pagar a fatura é ligado ao pagamento no cartão (mesmo valor, até 10 dias antes): os dois ficam fora de entradas e gastos. O Painel mostra as faturas pagas no mês e cada transação mostra a outra ponta.",
     "Painel com mais gráficos: ritmo do mês (gasto acumulado dia a dia, comparado ao mês anterior e com a projeção até o fim do mês), cores por categoria, como pagou (Pix, crédito, débito, vale), maiores gastos, onde mais gastou, dias da semana e gasto por conta.",
     "Pagamento de fatura não aparece mais na frase do topo do Painel (continua fora de entradas e saídas).",
     "Escolher categoria agora abre uma lista com busca: ela filtra enquanto você digita e, se não achar, oferece “+ Adicionar categoria”.",

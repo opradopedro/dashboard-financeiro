@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chavesDasLinhas, conferencia, importarLinhas, resolverRevisao, type EstadoJuntar } from '../src/core/juntar';
+import { chavesDasLinhas, conferencia, importarLinhas, resolverRevisao, type EstadoJuntar, aplicarEdicoes, txsDaImportacao } from '../src/core/juntar';
 import type { Transacao } from '../src/core/tipos';
 
 const tx = (id: string, conta: string, data: string, valor: number, tipo: 'notificacao' | 'manual' = 'notificacao', desc = 'NOTIF'): Transacao =>
@@ -77,5 +77,36 @@ describe('conferência mensal', () => {
     expect(c.soExtrato.map(t => t.desc)).toEqual(['B']);
     expect(c.soNotificacao.map(t => t.id)).toEqual(['z']);
     expect(c.periodo).toEqual({ de: '2026-10-01', ate: '2026-10-05' });
+  });
+});
+
+describe('edições da pré-visualização', () => {
+  const brutas = [
+    { data: '2026-08-02', desc: 'Pagamento recebido', valor: -1255.5 },
+    { data: '2026-08-06', desc: 'Uber', valor: 7.9 },
+    { data: '2026-08-10', desc: 'Google Youtube', valor: -16.9 },
+  ];
+  const ed = { excluir: [1], inverter: [0], cat: { 2: 'Assinaturas' }, tipo: { 0: 'fatura' as const } };
+
+  it('tira, inverte e guarda categoria e tipo; a chave é a da linha original', () => {
+    const ls = chavesDasLinhas('nu', brutas);
+    const r = aplicarEdicoes(ls, ed);
+    expect(r.excluidas).toEqual([ls[1].chave]);
+    expect(r.linhas.map(l => [l.valor, l.chave, l.cat, l.tipoUsuario])).toEqual([
+      [1255.5, ls[0].chave, undefined, 'fatura'], [-16.9, ls[2].chave, 'Assinaturas', undefined]]);
+  });
+
+  it('importar com edições: transação nova leva as escolhas; reimportar não traz nada de volta', () => {
+    const ls = chavesDasLinhas('nu', brutas);
+    const r = aplicarEdicoes(ls, ed);
+    const est = { txs: [], revisoes: [], excluidas: r.excluidas };
+    const a = importarLinhas(est, r.linhas, 'fatura.csv', '2026-10-10T00:00:00Z');
+    expect(a.txs.map(t => [t.valor, t.tipoUsuario, t.cat])).toEqual([[1255.5, 'fatura', undefined], [-16.9, undefined, 'Assinaturas']]);
+    const imp = a.importacao;
+    expect(txsDaImportacao(a.txs, imp).length).toBe(2);
+    // Mesmo arquivo de novo, sem mexer em nada: tudo repetido (inclusive a linha tirada).
+    const b = importarLinhas({ ...a, excluidas: r.excluidas }, chavesDasLinhas('nu', brutas), 'fatura.csv');
+    expect(b.importacao).toMatchObject({ novas: 0, repetidas: 3 });
+    expect(txsDaImportacao(b.txs, b.importacao)).toEqual([]);
   });
 });

@@ -1,11 +1,11 @@
 // Transações: lista com filtros, lançamento manual e edição (tipo, categoria, aplicar às parecidas).
 import { classificadas, excluirTx, mudar, nomeApp, nomeConta, salvarTx, state } from '../app';
-import { SEM_CATEGORIA } from '../core/classificar';
+import { SEM_CATEGORIA, type Classificada } from '../core/classificar';
 import { ORIGENS, TIPOS, type TipoTx, type Transacao } from '../core/tipos';
 import { arred, hoje, norm, parseValor, termoDe, uid } from '../core/util';
 import { $, esc, fmtD, fmtQuando, opcoes, sinal, toast } from './fmt';
 import { campoCategoria, ligarCampoCategoria, valorCampo } from './escolher';
-import { listaPorDia, mesAtual, navMes } from './painel';
+import { itemTx, listaPorDia, mesAtual, navMes } from './painel';
 import type { Rota } from './nav';
 import { trocar, voltar } from './nav';
 
@@ -86,6 +86,7 @@ export function telaTx(el: HTMLElement, id: string) {
     </form>
     <p class="note">Caixinha, transferência interna e pagamento de fatura não contam nas entradas e saídas. Estorno no cartão: tipo Saída com dinheiro Entrou (desconta do gasto).</p>
   </section>
+  ${x ? blocoPar(x) : ''}
   ${x ? `<section class="panel"><h2>De onde veio</h2><div class="folha"><div class="list">${x.origens.map(o => `<div class="item">
       <div class="name">${ORIGENS[o.tipo]}</div><div class="val">${sinal(o.valor)}</div>
       <div class="meta">${esc(o.desc)}, ${fmtD(o.data)}${o.arquivo ? `<br>${esc(o.arquivo)}` : ''}</div>
@@ -132,6 +133,18 @@ export function telaTx(el: HTMLElement, id: string) {
     toast('Excluída.');
     voltar();
   });
+}
+
+/** A outra ponta: o Pix que pagou a fatura, a fatura que ele pagou, ou a transferência entre contas suas. */
+function blocoPar(x: Classificada) {
+  const p = x.par ? classificadas().find(t => t.id === x.par) : undefined;
+  if (!p) return '';
+  const cartao = state.dados.contas.find(c => c.id === x.conta)?.tipo === 'cartao';
+  const titulo = x.t === 'fatura' ? (cartao ? 'Paga com' : 'Pagou a fatura') : 'A outra ponta';
+  const nota = x.t === 'fatura'
+    ? 'As duas ficam fora de entradas e gastos: o gasto já contou em cada compra do cartão.'
+    : 'Dinheiro seu indo de uma conta sua para outra: não conta como entrada nem gasto.';
+  return `<section class="panel"><h2>${titulo}</h2><div class="folha"><div class="list">${itemTx(p, true)}</div></div><p class="note">${nota}</p></section>`;
 }
 
 /** Linha curta de uma transação (para revisão e conferência). */
