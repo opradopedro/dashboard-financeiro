@@ -1,8 +1,9 @@
 // Indicadores do Painel: forma de pagamento, gasto por conta, ritmo do mês (acumulado dia a dia e
 // comparação com o mês anterior), dias da semana, maiores gastos e lugares onde mais gastou.
 // Tudo conta só as saídas (gasto); estorno (saída com valor positivo) desconta.
-import { ehContaVale, type Classificada } from './classificar';
-import type { Conta } from './tipos';
+import { contraparte } from './aprender';
+import { ehContaVale, SEM_CATEGORIA, type Classificada } from './classificar';
+import { contaNoTotal, type Conta } from './tipos';
 import { norm, somaMes, termoDe } from './util';
 
 export type Forma = 'credito' | 'pix' | 'debito' | 'vale' | 'boleto' | 'transferencia' | 'saque';
@@ -97,14 +98,38 @@ export const maioresGastos = (cls: Classificada[], mes: string, n = 5) =>
 
 export interface Lugar { termo: string; desc: string; v: number; n: number }
 
+/**
+ * Quem recebeu (sem "Pagamento com QR Pix", números e códigos): junta os gastos no mesmo lugar.
+ * Sem nome (ex.: só "Pix enviado"), fica a parte fixa da descrição.
+ */
+export const termoLugar = (desc: string) => contraparte(desc) || termoDe(desc) || norm(desc).trim();
+
 /** Onde mais gastou: gastos agrupados pela parte fixa da descrição (sem números e códigos). */
 export function lugares(cls: Classificada[], mes: string, n = 5): Lugar[] {
   const m = new Map<string, Lugar>();
   for (const x of doMes(cls, mes)) {
-    const t = termoDe(x.desc) || norm(x.desc).trim();
+    const t = termoLugar(x.desc);
     const l = m.get(t) || { termo: t, desc: x.desc, v: 0, n: 0 };
     l.v += gasto(x); l.n++;
     m.set(t, l);
   }
   return [...m.values()].filter(l => l.v > 0.005).sort((a, b) => b.v - a.v || b.n - a.n).slice(0, n);
+}
+
+/**
+ * Recorte de um indicador (a tela de detalhe de "Pix", "Flash", "sábados", um lugar ou uma
+ * categoria). Campos juntos valem todos (ex.: Pix em Mercado). Vale para todos os meses.
+ */
+export interface Recorte { forma?: Forma; conta?: string; lugar?: string; dia?: number; cat?: string }
+
+export function recortar(cls: Classificada[], contas: Conta[], r: Recorte): Classificada[] {
+  const c = new Map(contas.map(x => [x.id, x]));
+  const soGasto = r.forma != null || r.lugar != null || r.dia != null;
+  return cls.filter(x =>
+    (!soGasto || x.t === 'saida')
+    && (r.conta == null || x.conta === r.conta)
+    && (r.forma == null || formaPagamento(x, c.get(x.conta)) === r.forma)
+    && (r.lugar == null || termoLugar(x.desc) === r.lugar)
+    && (r.dia == null || new Date(`${x.data}T12:00:00Z`).getUTCDay() === r.dia)
+    && (r.cat == null || ((x.c || SEM_CATEGORIA) === r.cat && contaNoTotal(x.t))));
 }

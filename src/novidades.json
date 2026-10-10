@@ -3,7 +3,9 @@
     "Importação lê arquivos em UTF-16 (como o extrato da Flash salvo por alguns celulares), sinal de menos tipográfico (−) e espaços especiais nos valores.",
     "Importando um arquivo só que já foi importado: “Nenhuma linha nova” e “Importar mesmo assim” (sem destaque); se só parte já entrou, o botão diz quantas linhas são novas.",
     "Mudar várias transações de uma vez: em qualquer lista, toque e segure numa transação e marque outras (ou todas); a barra embaixo muda categoria, tipo ou conta, inverte o sinal ou exclui.",
-    "Reembolso e gasto ligados dividem a categoria: mudar em um muda no outro, e as duas telas mostram o vínculo."
+    "Reembolso e gasto ligados dividem a categoria: mudar em um muda no outro, e as duas telas mostram o vínculo.",
+    "Toque em qualquer parte do Painel para ver o detalhe: fatias dos gráficos de rosca e pizza (categorias, como pagou), Pix, crédito, vale, contas, lugares, dias da semana e meses do gráfico. O detalhe mostra total, média, divisões em rosca (também tocáveis), 12 meses e as transações; na transação, a categoria e a conta também abrem o detalhe.",
+    "“Onde mais gastou” separa cada lugar pago com QR Pix (antes juntava todos em “Pagamento com QR Pix”)."
   ],
   "versoes": [
     {

@@ -4,11 +4,11 @@ import { classificadas, mudar, nomeConta, state } from '../app';
 import { sugerirTitular } from '../core/sugestoes';
 import { nReembolsosPendentes } from './reembolsos';
 import { mesDaFatura, resumoMes, saldoEstimado, serieMeses, SEM_CATEGORIA, type Classificada } from '../core/classificar';
-import { FORMAS, lugares, maioresGastos, porConta, porDiaSemana, porForma, ritmo, acumulado } from '../core/indicadores';
+import { FORMAS, lugares, maioresGastos, porConta, porDiaSemana, porForma, recortar, ritmo, acumulado, type Fatia, type Forma, type Recorte } from '../core/indicadores';
 import { TIPOS, contaNoTotal } from '../core/tipos';
 import { hoje, somaDias, somaMes } from '../core/util';
 import { brl, compact, esc, fmtD, fmtNum, fmtYm, MES, mesLongo, sinal, toast } from './fmt';
-import { COR_OUTRAS, CORES_CAT, fitaEmpilhada, graficoRitmo, graficoSemana } from './graficos';
+import { COR_OUTRAS, CORES_CAT, graficoRitmo, graficoSemana, rosca } from './graficos';
 import { trocar } from './nav';
 import { botaoFiltro, clsFiltradas, filtroAtivo, ligarFiltro, linhaFiltro } from './filtro';
 import { ICONES } from './icones';
@@ -29,6 +29,70 @@ function coresCategorias(cats: { cat: string }[]) {
   return m;
 }
 export const mesAtual = () => mesSel || hoje().slice(0, 7);
+
+/** Cor fixa de cada forma de pagamento (a mesma em todas as telas). */
+const COR_FORMA: Record<Forma, string> = {
+  credito: CORES_CAT[0], pix: CORES_CAT[1], debito: CORES_CAT[2], vale: CORES_CAT[3], boleto: CORES_CAT[4], transferencia: CORES_CAT[5], saque: COR_OUTRAS,
+};
+
+interface Parte { rotulo: string; v: number; n: number; cor: string; ir: string }
+
+/**
+ * Rosca (ou pizza) + lista: cada fatia e cada linha abrem o detalhe daquela parte.
+ * `unidade` = singular e plural do que é contado (gasto/gastos, entrada/entradas).
+ */
+function blocoPartes(ps: Parte[], total: number, opc: { centro?: string; pizza?: boolean; unidade: [string, string] }) {
+  if (!ps.length) return '';
+  const maior = ps[0].v || 1;
+  const grafico = rosca(ps.map(p => ({ v: p.v, cor: p.cor, rotulo: p.rotulo, ir: p.ir })),
+    opc.pizza ? undefined : { valor: brl(total), legenda: opc.centro || '' }, opc.pizza ? { furo: 0, tam: 168 } : {});
+  return `${grafico}<div class="folha"><div class="list">${ps.map(p => `<button type="button" class="item cat-linha" data-ir="${esc(p.ir)}">
+      <div class="name">${esc(p.rotulo)}</div><div class="val">${brl(p.v)}</div>
+      <div class="barra"><i style="width:${Math.max(2, p.v / maior * 100).toFixed(1)}%;background:${p.cor}"></i></div>
+      <div class="meta">${p.n === 1 ? `1 ${opc.unidade[0]}` : `${p.n} ${opc.unidade[1]}`}</div><div class="meta r">${total > 0 ? fmtNum(p.v / total * 100) + '%' : ''}</div></button>`).join('')}</div></div>`;
+}
+
+/** Partes por categoria (cores pela ordem: as 6 maiores com cor própria). */
+function partesCat(cats: { cat: string; v: number; n: number }[], ir: (cat: string) => string): Parte[] {
+  const cores = coresCategorias(cats);
+  return cats.map(c => ({ rotulo: c.cat, v: c.v, n: c.n, cor: cores.get(c.cat)!, ir: ir(c.cat) }));
+}
+const partesForma = (fs: Fatia<Forma>[], ir: (f: Forma) => string): Parte[] =>
+  fs.map(f => ({ rotulo: FORMAS[f.chave], v: f.v, n: f.n, cor: COR_FORMA[f.chave], ir: ir(f.chave) }));
+const partesConta = (fs: Fatia[], ir: (c: string) => string): Parte[] =>
+  fs.map((f, i) => ({ rotulo: nomeConta(f.chave), v: f.v, n: f.n, cor: CORES_CAT[i] || COR_OUTRAS, ir: ir(f.chave) }));
+const irCat = (cat: string) => `cat/${encodeURIComponent(cat)}`;
+
+/** Rota da tela de detalhe de um recorte (`nome` = como mostrar um lugar). */
+export function rotaDetalhe(r: Recorte, nome = '') {
+  const q = new URLSearchParams();
+  if (r.forma) q.set('forma', r.forma);
+  if (r.conta) q.set('conta', r.conta);
+  if (r.lugar != null) q.set('lugar', r.lugar);
+  if (r.dia != null) q.set('dia', String(r.dia));
+  if (r.cat != null) q.set('cat', r.cat);
+  if (nome) q.set('nome', nome);
+  // Só categoria: a tela da categoria (mesma tela, rota curta).
+  return Object.keys(r).filter(k => (r as Record<string, unknown>)[k] != null).join() === 'cat' ? irCat(r.cat!) : `detalhe?${q}`;
+}
+
+export function recorteDe(q: URLSearchParams): Recorte {
+  const r: Recorte = {};
+  if (q.get('forma') && q.get('forma')! in FORMAS) r.forma = q.get('forma') as Forma;
+  if (q.get('conta')) r.conta = q.get('conta')!;
+  if (q.has('lugar')) r.lugar = q.get('lugar')!;
+  if (q.get('dia') && /^[0-6]$/.test(q.get('dia')!)) r.dia = Number(q.get('dia'));
+  if (q.has('cat')) r.cat = q.get('cat')!;
+  return r;
+}
+
+const DIAS_PLURAL = ['Domingos', 'Segundas', 'Terças', 'Quartas', 'Quintas', 'Sextas', 'Sábados'];
+
+/** Título do detalhe: "Pix", "Flash", "Sábados", "Mercado, Crédito"… */
+export function tituloRecorte(r: Recorte, nome = '') {
+  return [r.cat, r.lugar != null ? nome || r.lugar : '', r.forma ? FORMAS[r.forma] : '', r.conta ? nomeConta(r.conta) : '', r.dia != null ? DIAS_PLURAL[r.dia] : '']
+    .filter(Boolean).join(', ') || 'Detalhe';
+}
 
 const ehEntrada = (x: Classificada) => x.t === 'entrada' || (x.t === 'saida' && x.valor > 0);
 
@@ -66,7 +130,7 @@ export function nomeDia(d: string) {
   return `${DIAS[dt.getDay()]}, ${dt.getDate()} de ${MES[dt.getMonth()]}${d.slice(0, 4) === h.slice(0, 4) ? '' : ` de ${d.slice(0, 4)}`}`;
 }
 
-/** Barras de entradas x saídas por mês (SVG; cores validadas para daltonismo). */
+/** Barras de entradas x saídas por mês (SVG; cores validadas para daltonismo). Tocar num mês abre o mês. */
 export function graficoMeses(el: HTMLElement, s: { mes: string; entradas: number; saidas: number }[], atual: string) {
   const W = Math.max(280, el.clientWidth || 320), H = 170, L = 40, R = 4, T = 8, B = 24;
   const max = Math.max(1, ...s.flatMap(x => [x.entradas, x.saidas]));
@@ -85,7 +149,7 @@ export function graficoMeses(el: HTMLElement, s: { mes: string; entradas: number
     if (x.entradas > 0) g += barra(x0, x.entradas, w, 'var(--entrada)', op);
     if (x.saidas > 0) g += barra(x0 + w + 2, x.saidas, w, 'var(--saida)', op);
     if ((s.length - 1 - i) % 2 === 0) g += `<text x="${(L + i * bw + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="10.5" fill="var(--grafite)">${MES[parseInt(x.mes.slice(5), 10) - 1]}</text>`;
-    g += `<rect x="${(L + i * bw).toFixed(1)}" y="${T}" width="${bw.toFixed(1)}" height="${H - T - B}" fill="transparent"><title>${fmtYm(x.mes)}: entradas ${brl(x.entradas)}, saídas ${brl(x.saidas)}</title></rect>`;
+    g += `<rect x="${(L + i * bw).toFixed(1)}" y="${T}" width="${bw.toFixed(1)}" height="${H - B}" fill="transparent" data-mes-ir="${x.mes}" class="parte"><title>${fmtYm(x.mes)}: entradas ${brl(x.entradas)}, saídas ${brl(x.saidas)}</title></rect>`;
   });
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Entradas e saídas por mês" font-family="inherit">${g}</svg>`;
 }
@@ -111,7 +175,6 @@ export function telaPainel(el: HTMLElement) {
   const r = resumoMes(cls, mes);
   const n = state.nativo;
   const semRegra = d.notifs.filter(x => x.status === 'sem-regra' || x.status === 'erro').length;
-  const maior = r.porCategoria[0]?.v || 1;
   const avisos: string[] = [];
   if (n && !n.web && !n.acessoPermitido) avisos.push(`<button type="button" class="aviso" data-ir="boasvindas">A captura de notificações está desligada. Toque para liberar.</button>`);
   if (d.revisoes.length) avisos.push(`<button type="button" class="aviso" data-ir="revisao">${d.revisoes.length === 1 ? '1 linha de extrato espera' : `${d.revisoes.length} linhas de extrato esperam`} sua revisão</button>`);
@@ -125,16 +188,8 @@ export function telaPainel(el: HTMLElement) {
   const pe = total > 0 ? (r.entradas / total) * 100 : 50;
   // Pagamento de fatura fica fora da conta (o gasto já contou na compra) e não aparece aqui.
   const fora = [r.fora.caixinha && `caixinha ${brl(r.fora.caixinha)}`, r.fora.interna && `transferências entre suas contas ${brl(r.fora.interna)}`].filter(Boolean);
-  const cores = coresCategorias(r.porCategoria);
-  const fatiasCat: { v: number; cor: string; rotulo: string }[] = [];
-  for (const c of r.porCategoria) {
-    const cor = cores.get(c.cat)!;
-    const ult = fatiasCat[fatiasCat.length - 1];
-    if (cor === COR_OUTRAS && ult?.cor === COR_OUTRAS) { ult.v += c.v; ult.rotulo = 'outras'; } else fatiasCat.push({ v: c.v, cor, rotulo: cor === COR_OUTRAS ? 'outras' : c.cat });
-  }
   const rt = ritmo(cls, mes, hoje());
   const formas = porForma(cls, d.contas, mes);
-  const maiorForma = formas[0]?.v || 1;
   const gastoConta = new Map(porConta(cls, mes).map(f => [f.chave, f.v]));
   const maiorConta = Math.max(1, ...gastoConta.values());
   const semana = porDiaSemana(cls, mes);
@@ -163,18 +218,13 @@ export function telaPainel(el: HTMLElement) {
 
   <section class="panel">
     <div class="row between"><h2>Para onde foi</h2><span class="sub">${brl(r.saidas)}</span></div>
-    ${fitaEmpilhada(fatiasCat)}
-    <div class="folha"><div class="list">${r.porCategoria.length ? r.porCategoria.map(c => `<button type="button" class="item cat-linha" data-ir="cat/${encodeURIComponent(c.cat)}">
-      <div class="name">${esc(c.cat)}</div><div class="val">${brl(c.v)}</div>
-      <div class="barra"><i style="width:${Math.max(2, c.v / maior * 100).toFixed(1)}%;background:${cores.get(c.cat)}"></i></div>
-      <div class="meta">${c.n === 1 ? '1 transação' : `${c.n} transações`}</div><div class="meta r">${r.saidas > 0 ? fmtNum(c.v / r.saidas * 100) + '%' : ''}</div></button>`).join('')
-      : '<div class="empty">Nenhum gasto neste mês.</div>'}</div></div>
+    ${r.porCategoria.length ? blocoPartes(partesCat(r.porCategoria, irCat), r.saidas, { centro: 'gastos', unidade: ['transação', 'transações'] }) : '<div class="empty">Nenhum gasto neste mês.</div>'}
     ${r.semCategoria ? `<button type="button" class="btn small" data-ir="semcat/${mes}">Categorizar ${r.semCategoria === 1 ? '1 transação' : `${r.semCategoria} transações`}</button>` : ''}
   </section>
 
   ${rt.total > 0 || rt.anterior > 0 ? `<section class="panel">
     <h2>Ritmo do mês</h2>
-    <div class="caixa">
+    <div class="caixa tocavel" data-ir="movimentos/saida" role="button" aria-label="Ver as saídas do mês">
       <div class="stats">
         <div><span class="label">Por dia</span><b class="lg">${brl(rt.porDia)}</b></div>
         <div><span class="label">${rt.projecao != null ? 'Até agora' : 'No mês'}</span><b class="lg">${brl(rt.total)}</b></div>
@@ -189,10 +239,7 @@ export function telaPainel(el: HTMLElement) {
 
   ${formas.length ? `<section class="panel">
     <h2>Como pagou</h2>
-    <div class="folha"><div class="list">${formas.map(f => `<div class="item cat-linha">
-      <div class="name">${FORMAS[f.chave]}</div><div class="val">${brl(f.v)}</div>
-      <div class="barra"><i style="width:${Math.max(2, f.v / maiorForma * 100).toFixed(1)}%"></i></div>
-      <div class="meta">${f.n === 1 ? '1 gasto' : `${f.n} gastos`}</div><div class="meta r">${r.saidas > 0 ? pct(f.v / r.saidas) : ''}</div></div>`).join('')}</div></div>
+    ${blocoPartes(partesForma(formas, f => rotaDetalhe({ forma: f })), r.saidas, { pizza: true, unidade: ['gasto', 'gastos'] })}
     <p class="note">Pela conta (cartão = crédito; vale = conta de benefício) e pela descrição (Pix, boleto, transferência). O resto que saiu da conta conta como débito.</p>
   </section>` : ''}
 
@@ -202,7 +249,7 @@ export function telaPainel(el: HTMLElement) {
       <button type="button" data-top="lugares" aria-pressed="${vistaTop === 'lugares'}">Onde mais gastou</button>
     </div>
     <div class="folha" data-vista="maiores"${vistaTop === 'maiores' ? '' : ' hidden'}><div class="list">${maiores.map(x => itemTx(x, true)).join('')}</div></div>
-    <div class="folha" data-vista="lugares"${vistaTop === 'lugares' ? '' : ' hidden'}><div class="list">${onde.map(l => `<button type="button" class="item" data-aba="transacoes?q=${encodeURIComponent(l.termo)}">
+    <div class="folha" data-vista="lugares"${vistaTop === 'lugares' ? '' : ' hidden'}><div class="list">${onde.map(l => `<button type="button" class="item" data-ir="${esc(rotaDetalhe({ lugar: l.termo }, l.desc))}">
       <div class="name">${esc(l.desc)}</div><div class="val">${brl(l.v)}</div>
       <div class="meta">${l.n === 1 ? '1 vez' : `${l.n} vezes`}${l.n > 1 ? `, média de ${brl(l.v / l.n)}` : ''}</div><div class="meta r">${r.saidas > 0 ? pct(l.v / r.saidas) : ''}</div></button>`).join('')}</div></div>
   </section>
@@ -210,16 +257,17 @@ export function telaPainel(el: HTMLElement) {
   <section class="panel">
     <h2>Dias da semana</h2>
     <div class="caixa"><div id="chSemana" class="chart"></div>
-      <p class="sub">${DIAS_LONGOS[diaTop].charAt(0).toUpperCase() + DIAS_LONGOS[diaTop].slice(1)} é o dia em que mais gastou neste mês: ${brl(semana[diaTop])}.</p></div>
+      <p class="sub">${DIAS_LONGOS[diaTop].charAt(0).toUpperCase() + DIAS_LONGOS[diaTop].slice(1)} é o dia em que mais gastou neste mês: ${brl(semana[diaTop])}. Toque num dia para ver os gastos dele.</p></div>
   </section>` : ''}
 
-  ${r.entradasPorCategoria.length ? `<section class="panel"><h2>De onde veio</h2><div class="folha"><div class="list">${r.entradasPorCategoria.map(c => `<button type="button" class="item" data-ir="cat/${encodeURIComponent(c.cat)}">
-      <div class="name">${esc(c.cat)}</div><div class="val">${brl(c.v)}</div><div class="meta">${c.n === 1 ? '1 entrada' : `${c.n} entradas`}</div><div class="meta r"></div></button>`).join('')}</div></div></section>` : ''}
+  ${r.entradasPorCategoria.length ? `<section class="panel"><div class="row between"><h2>De onde veio</h2><span class="sub">${brl(r.entradas)}</span></div>
+    ${blocoPartes(partesCat(r.entradasPorCategoria, irCat), r.entradas, { centro: 'entradas', unidade: ['entrada', 'entradas'] })}</section>` : ''}
 
   <section class="panel">
     <h2>Últimos 12 meses</h2>
     <div class="legenda"><span><i style="background:var(--entrada)"></i>Entradas</span><span><i style="background:var(--saida)"></i>Saídas</span></div>
     <div id="chMeses" class="chart"></div>
+    <p class="note">Toque num mês para abrir o mês.</p>
   </section>
 
   <section class="panel">
@@ -228,7 +276,7 @@ export function telaPainel(el: HTMLElement) {
       const s = saldoEstimado(d.txs, c);
       const rc = resumoMes(cls, mes, c.id);
       const gc = gastoConta.get(c.id) || 0;
-      return `<button type="button" class="item cat-linha" data-aba="transacoes?conta=${encodeURIComponent(c.id)}"><div class="name">${esc(c.nome)}</div>
+      return `<button type="button" class="item cat-linha" data-ir="${esc(rotaDetalhe({ conta: c.id }))}"><div class="name">${esc(c.nome)}</div>
       <div class="val">${s == null ? '' : brl(s)}</div>
       <div class="barra"><i style="width:${gc ? Math.max(2, gc / maiorConta * 100).toFixed(1) : 0}%"></i></div>
       <div class="meta">${c.tipo === 'cartao' ? 'Gastos' : 'Saídas'} no mês: ${brl(rc.saidas)}</div>
@@ -252,7 +300,7 @@ export function telaPainel(el: HTMLElement) {
   const chR = el.querySelector<HTMLElement>('#chRitmo');
   if (chR) graficoRitmo(chR, acumulado(cls, mes), rt.dias, acumulado(cls, somaMes(mes, -1)), rt.projecao, [nomeMes(mes), ant]);
   const chS = el.querySelector<HTMLElement>('#chSemana');
-  if (chS) graficoSemana(chS, semana);
+  if (chS) graficoSemana(chS, semana, dia => rotaDetalhe({ dia }));
   el.querySelectorAll<HTMLButtonElement>('[data-top]').forEach(b => (b.onclick = () => {
     vistaTop = b.dataset.top as typeof vistaTop;
     el.querySelectorAll<HTMLButtonElement>('[data-top]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
@@ -301,6 +349,8 @@ export function telaMovimentos(el: HTMLElement, tipo: string) {
     .sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm));
   const total = xs.reduce((s, x) => s + (ent ? x.valor : -x.valor), 0);
   const estornos = ent ? 0 : xs.filter(x => x.valor > 0).length;
+  const rm = resumoMes(clsFiltradas(), mes);
+  const cats = ent ? rm.entradasPorCategoria : rm.porCategoria;
   el.innerHTML = `<section class="fita">
     ${navMes(mes, botaoFiltro())}
     ${linhaFiltro()}
@@ -311,29 +361,82 @@ export function telaMovimentos(el: HTMLElement, tipo: string) {
     <p class="frase">${xs.length ? `${ent ? 'Entrou' : 'Saiu'} <b>${brl(total)}</b> em ${xs.length === 1 ? (ent ? '1 entrada' : '1 gasto') : `${xs.length} ${ent ? 'entradas' : 'gastos'}`}.` : `Nenhuma ${ent ? 'entrada' : 'saída'} neste mês.`}</p>
     ${estornos ? `<p class="sub">Inclui ${estornos === 1 ? '1 estorno' : `${estornos} estornos`}, que descontam do total.</p>` : ''}
   </section>
-  ${xs.length ? `<section class="panel"><div class="folha"><div class="list">${listaPorDia(xs)}</div></div>
+  ${cats.length ? `<section class="panel"><h2>Por categoria</h2>
+    ${blocoPartes(partesCat(cats, irCat), ent ? rm.entradas : rm.saidas, { centro: ent ? 'entradas' : 'gastos', unidade: ent ? ['entrada', 'entradas'] : ['transação', 'transações'] })}</section>` : ''}
+  ${xs.length ? `<section class="panel"><h2>${ent ? 'Entradas' : 'Saídas'} do mês</h2><div class="folha"><div class="list">${listaPorDia(xs)}</div></div>
     <p class="note">Caixinha, transferências entre suas contas e pagamento de fatura não aparecem aqui: são dinheiro seu mudando de lugar.</p></section>` : ''}`;
   el.querySelectorAll<HTMLButtonElement>('[data-trocar]').forEach(b => (b.onclick = () => trocar(`movimentos/${b.dataset.trocar}`)));
   ligarFiltro(el);
 }
 
-export function telaCategoria(el: HTMLElement, cat: string) {
+/**
+ * Detalhe de qualquer parte do Painel (categoria, forma de pagamento, conta, lugar, dia da
+ * semana, ou várias juntas): total do mês, média, as divisões que ainda fazem sentido (em rosca,
+ * tocáveis), 12 meses e as transações do mês.
+ */
+export function telaDetalhe(el: HTMLElement, rec: Recorte, nome = '') {
+  const d = state.dados;
   const mes = mesAtual();
-  const cls = clsFiltradas().filter(x => (x.c || SEM_CATEGORIA) === cat && contaNoTotal(x.t));
-  const doMes = cls.filter(x => x.data.slice(0, 7) === mes).sort((a, b) => b.data.localeCompare(a.data));
-  const receita = state.dados.categorias.find(c => c.nome === cat)?.receita ?? false;
-  const total = doMes.reduce((s, x) => s + (receita ? x.valor : -x.valor), 0);
-  const meses = serieMeses(cls, mes, 12);
-  const media = meses.slice(0, -1).reduce((s, m) => s + (receita ? m.entradas : m.saidas), 0) / 11;
+  const sub = recortar(clsFiltradas(), d.contas, rec);
+  const r = resumoMes(sub, mes);
+  const doMes = sub.filter(x => x.data.slice(0, 7) === mes).sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm));
+  const nG = doMes.filter(x => x.t === 'saida').length, nE = doMes.filter(x => x.t === 'entrada').length;
+  const meses = serieMeses(sub, mes, 12);
+  const temE = meses.some(m => m.entradas > 0), temS = meses.some(m => m.saidas > 0);
+  const soEntrada = temE && !temS;
+  const media = meses.slice(0, -1).reduce((a, m) => a + (soEntrada ? m.entradas : m.saidas), 0) / 11;
+  const conta = rec.conta ? d.contas.find(c => c.id === rec.conta) : undefined;
+  const com = (extra: Recorte) => rotaDetalhe({ ...rec, ...extra }, nome);
+  const gastos = (n: number) => (n === 1 ? '1 gasto' : `${n} gastos`), entradas = (n: number) => (n === 1 ? '1 entrada' : `${n} entradas`);
+  const frase = nG ? `Saiu <b>${brl(r.saidas)}</b> em ${gastos(nG)}.` : nE ? `Entrou <b>${brl(r.entradas)}</b> em ${entradas(nE)}.` : 'Nada entrou nem saiu neste mês.';
+  const fraseE = nG && nE ? `Entrou ${brl(r.entradas)} em ${entradas(nE)}.` : '';
+  const secoes: string[] = [];
+  const secao = (h: string, total: number, corpo: string) => corpo && secoes.push(`<section class="panel"><div class="row between"><h2>${h}</h2><span class="sub">${brl(total)}</span></div>${corpo}</section>`);
+  if (rec.cat == null && r.porCategoria.length)
+    secao('Por categoria', r.saidas, blocoPartes(partesCat(r.porCategoria, c => com({ cat: c })), r.saidas, { centro: 'gastos', unidade: ['gasto', 'gastos'] }));
+  const formas = porForma(sub, d.contas, mes);
+  if (!rec.forma && formas.length > 1)
+    secao('Como pagou', r.saidas, blocoPartes(partesForma(formas, f => com({ forma: f })), r.saidas, { pizza: true, unidade: ['gasto', 'gastos'] }));
+  const contas = porConta(sub, mes);
+  if (!rec.conta && contas.length > 1)
+    secao('Por conta', r.saidas, blocoPartes(partesConta(contas, c => com({ conta: c })), r.saidas, { centro: 'gastos', unidade: ['gasto', 'gastos'] }));
+  if (rec.cat == null && r.entradasPorCategoria.length)
+    secao('De onde veio', r.entradas, blocoPartes(partesCat(r.entradasPorCategoria, c => com({ cat: c })), r.entradas, { centro: 'entradas', unidade: ['entrada', 'entradas'] }));
+  if (rec.lugar == null && !rec.forma && !rec.conta && rec.dia == null) {
+    // Categoria: onde mais gastou nela.
+    const onde = lugares(sub, mes, 5).filter(l => l.n > 0);
+    if (onde.length > 1) secoes.push(`<section class="panel"><h2>Onde mais gastou</h2><div class="folha"><div class="list">${onde.map(l => `<button type="button" class="item" data-ir="${esc(rotaDetalhe({ ...rec, lugar: l.termo }, l.desc))}">
+      <div class="name">${esc(l.desc)}</div><div class="val">${brl(l.v)}</div>
+      <div class="meta">${l.n === 1 ? '1 vez' : `${l.n} vezes`}${l.n > 1 ? `, média de ${brl(l.v / l.n)}` : ''}</div><div class="meta r">${r.saidas > 0 ? pct(l.v / r.saidas) : ''}</div></button>`).join('')}</div></div></section>`);
+  }
+  const outros = Object.keys(rec).length > 1;
+  const botoes = [
+    rec.cat != null && outros ? `<button type="button" class="btn small" data-ir="${irCat(rec.cat)}">Toda a categoria ${esc(rec.cat)}</button>` : '',
+    conta ? `<button type="button" class="btn small" data-aba="transacoes?conta=${encodeURIComponent(conta.id)}">Ver transações</button>` : '',
+    conta ? `<button type="button" class="btn small" data-ir="conta/${encodeURIComponent(conta.id)}">Editar conta</button>` : '',
+  ].filter(Boolean);
+  const saldo = conta ? saldoEstimado(d.txs, conta) : null;
   el.innerHTML = `<section class="fita">
-    ${navMes(mes)}
-    <p class="frase">${esc(cat)}: <b>${brl(total)}</b></p>
-    <p class="sub">Média dos 11 meses anteriores: ${brl(media)}</p>
-    <div id="chCat" class="chart"></div>
+    ${navMes(mes, botaoFiltro())}
+    ${linhaFiltro()}
+    <p class="frase">${frase}</p>
+    ${fraseE ? `<p class="sub">${fraseE}</p>` : ''}
+    ${media > 0.005 ? `<p class="sub">Média dos 11 meses anteriores: ${brl(media)}${soEntrada ? '' : ' de gastos'}.</p>` : ''}
+    ${saldo != null ? `<p class="sub">${conta!.tipo === 'cartao' ? 'Fatura estimada' : 'Saldo estimado'}: ${brl(saldo)}.</p>` : ''}
+    ${botoes.length ? `<div class="row">${botoes.join('')}</div>` : ''}
   </section>
-  <section class="panel"><h2>Transações</h2><div class="folha"><div class="list">${listaPorDia(doMes) || '<div class="empty">Nada neste mês.</div>'}</div></div></section>`;
-  graficoMeses(el.querySelector('#chCat')!, meses.map(m => (receita ? { ...m, saidas: 0 } : { ...m, entradas: 0 })), mes);
+  ${secoes.join('')}
+  ${temE || temS ? `<section class="panel"><h2>Últimos 12 meses</h2>
+    ${temE && temS ? `<div class="legenda"><span><i style="background:var(--entrada)"></i>Entradas</span><span><i style="background:var(--saida)"></i>Saídas</span></div>` : ''}
+    <div id="chDet" class="chart"></div></section>` : ''}
+  <section class="panel"><h2>Transações do mês</h2><div class="folha"><div class="list">${listaPorDia(doMes) || '<div class="empty">Nada neste mês.</div>'}</div></div>
+    ${conta && doMes.some(x => !contaNoTotal(x.t)) ? '<p class="note">Inclui caixinha, transferências entre suas contas e pagamento de fatura, que não contam como entrada nem gasto.</p>' : ''}</section>`;
+  const ch = el.querySelector<HTMLElement>('#chDet');
+  if (ch) graficoMeses(ch, meses, mes);
+  ligarFiltro(el);
 }
+
+export const telaCategoria = (el: HTMLElement, cat: string) => telaDetalhe(el, { cat });
 
 export function telaSemCategoria(el: HTMLElement) {
   const mes = mesAtual();
@@ -351,6 +454,11 @@ export function telaFora(el: HTMLElement) {
     <p class="sub">Dinheiro seu mudando de lugar: caixinha e reserva, transferência entre suas contas, Pix para você mesmo e pagamento de fatura (as compras do cartão já contam como saída na data da compra). Nada disso entra nas entradas e saídas.</p>
     <p class="note">Se algo aqui for entrada ou gasto de verdade, toque nele e mude o tipo.</p></section>
   <div class="folha"><div class="list">${listaPorDia(lista) || '<div class="empty">Nada neste mês.</div>'}</div></div>`;
+}
+
+/** Abre um mês (toque numa barra do gráfico de 12 meses). */
+export function abrirMes(ym: string) {
+  if (/^\d{4}-\d{2}$/.test(ym) && ym <= hoje().slice(0, 7)) mesSel = ym;
 }
 
 export function mudarMes(delta: number) {

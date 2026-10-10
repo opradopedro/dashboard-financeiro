@@ -51,6 +51,7 @@ src/
     util.ts        norm(), termoDe(), parseValor(), parseData(), datas
     classificar.ts tipo final + categoria (adaptado do carteira), resumoMes, serieMeses
     indicadores.ts forma de pagamento, gasto por conta, ritmo do mês, dias da semana, maiores, lugares
+                   (termoLugar = contraparte), recortar() (detalhe: forma/conta/lugar/dia/cat juntos)
     regras.ts      regra de notificação → transação (regex com grupos valor/desc/data)
     automatica.ts  botões Adicionar/Ignorar: gerarRegraAuto, gerarRegraIgnorar, aplicarDecisoes
     migracoes.ts   versões dos dados (v2: Flash, regras reais; v3: categoria Voucher); regras-v1.json = regras padrão da v1
@@ -68,7 +69,8 @@ src/
   dados/db.ts      IndexedDB: um registro 'dados' com tudo, gravado inteiro a cada mudança
   nativo/notificacoes.ts  ponte com o plugin Kotlin (+ imitação para navegador)
   app.ts           estado, mudar() (fila de gravações), consumirFila(), classificadas() com cache
-  ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts, graficos.ts (SVG),
+  ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts, graficos.ts (SVG; rosca()
+                   com fatias data-ir), painel.ts (telaDetalhe: rota detalhe?forma=&conta=&lugar=&dia=&cat=; cat/<nome>),
                    escolher.ts (folhas: categoria com busca, opção, confirmar), datas.ts, reembolsos.ts (bloco na transação, lista), filtro.ts (filtro em uso na memória,
                    clsFiltradas, folha, Filtros salvos), novidades.ts
   novidades.json   histórico de versões + `proxima` (pendentes); gera as notas da Release
@@ -165,6 +167,8 @@ cartões iguais para tudo. A peça marcante é o topo do Painel (mês grande + f
   massa (e na transação) passa por `definirCategoria` (sugestoes.ts): reembolso ligado grava no gasto.
 - Telas com `vivo: true` em `main.ts` são refeitas quando os dados mudam; formulários não.
   Para refazer a tela atual depois de uma ação: `dispatchEvent(new Event('rerender'))`.
+- Tudo que mostra uma parte (fatia, barra, linha de indicador) abre o detalhe dela: `data-ir` com
+  `rotaDetalhe({...})` (vale em elementos SVG); barra de mês usa `data-mes-ir="AAAA-MM"`.
 - Toda mudança de dados passa por `mudar(d => novoD)` (grava e notifica). Não mutar `state.dados`.
 - Campos novos em `Dados`: adicionar em `tipos.ts`, `padroes.ts` (`dadosIniciais`) e `sanear()`
   em `backup.ts` (é ele que migra dados antigos). Teste de ida e volta em `tests/backup.test.ts`.

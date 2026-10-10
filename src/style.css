@@ -253,8 +253,14 @@ dialog.folha-sel::backdrop{background:rgba(6,9,15,.62)}
 @keyframes sobe{from{transform:translateY(24px);opacity:.4}to{transform:none;opacity:1}}
 
 /* ---------- painel: indicadores ---------- */
-.fita-cats{display:flex;gap:2px;height:14px;border-radius:7px;overflow:hidden}
-.fita-cats i{display:block;height:100%;min-width:3px}
+.rosca{display:flex;justify-content:center;padding:4px 0}
+.rosca svg{max-width:100%;height:auto;overflow:visible}
+.caixa .rosca{--fundo-rosca:var(--lousa)}
+.parte{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .15s}
+.parte:active{opacity:.7}
+path.parte:hover{opacity:.85}
+.tocavel{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tocavel:active{background:var(--lousa-alta)}
 .legenda .traco{width:16px;height:0;border-radius:0;border-top:2.2px solid var(--saida)}
 .legenda .traco.ant{border-top:1.5px dashed var(--grafite)}
 .legenda .traco.proj{border-top:2px dotted var(--saida);opacity:.8}

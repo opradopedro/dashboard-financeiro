@@ -12,7 +12,7 @@ import { ICONES } from './ui/icones';
 import { nativo } from './nativo/notificacoes';
 import { $, $$, toast } from './ui/fmt';
 import { ABAS, aba, ir, rotaAtual, voltar, type Rota } from './ui/nav';
-import { mudarMes, telaCategoria, telaFora, telaMovimentos, telaPainel, telaSemCategoria } from './ui/painel';
+import { abrirMes, mudarMes, recorteDe, telaCategoria, telaDetalhe, telaFora, telaMovimentos, telaPainel, telaSemCategoria, tituloRecorte } from './ui/painel';
 import { telaFiltros } from './ui/filtro';
 import { telaReembolsos } from './ui/reembolsos';
 import { telaTransacoes, telaTx } from './ui/transacoes';
@@ -39,6 +39,7 @@ const TELAS: Record<string, Tela> = {
   reembolsos: { titulo: 'Reembolsos', render: el => telaReembolsos(el), vivo: true },
   filtros: { titulo: 'Filtros salvos', render: el => telaFiltros(el), vivo: true },
   cat: { titulo: r => r.params[0], render: (el, r) => telaCategoria(el, r.params[0]), vivo: true },
+  detalhe: { titulo: r => tituloRecorte(recorteDe(r.query), r.query.get('nome') || ''), render: (el, r) => telaDetalhe(el, recorteDe(r.query), r.query.get('nome') || ''), vivo: true },
   semcat: { titulo: 'Sem categoria', render: el => telaSemCategoria(el), vivo: true },
   fora: { titulo: 'Não contam', render: el => telaFora(el), vivo: true },
   notif: { titulo: 'Notificação', render: (el, r) => telaNotif(el, r.params[0]), vivo: true },
@@ -98,17 +99,18 @@ let ultimaRota = '';
 addEventListener('hashchange', () => {
   const h = location.hash;
   render(h !== ultimaRota);
-  if (h.split('?')[0] !== ultimaRota.split('?')[0]) scrollTo(0, 0);
+  if (h.split('?')[0] !== ultimaRota.split('?')[0] || h.indexOf('/detalhe?') >= 0) scrollTo(0, 0);
   ultimaRota = h;
 });
 addEventListener('rerender', () => render(false));
 
-// Navegação por atributos: data-ir (página), data-aba (troca de aba), data-mes-mudar.
+// Navegação por atributos: data-ir (página), data-aba (troca de aba), data-mes-mudar, data-mes-ir.
 document.addEventListener('click', e => {
-  const alvo = (e.target as HTMLElement).closest<HTMLElement>('[data-ir],[data-aba],[data-mes-mudar],#btnVoltar');
+  const alvo = (e.target as HTMLElement).closest<HTMLElement>('[data-ir],[data-aba],[data-mes-mudar],[data-mes-ir],#btnVoltar');
   if (!alvo) return;
   if (alvo.id === 'btnVoltar') { voltar(); return; }
   if (alvo.dataset.mesMudar) { mudarMes(+alvo.dataset.mesMudar); render(false); return; }
+  if (alvo.dataset.mesIr) { abrirMes(alvo.dataset.mesIr); render(false); scrollTo(0, 0); return; }
   e.preventDefault();
   if (alvo.dataset.ir != null) ir(alvo.dataset.ir);
   else if (alvo.dataset.aba != null) aba(alvo.dataset.aba);

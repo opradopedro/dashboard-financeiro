@@ -1,13 +1,13 @@
 // Transações: lista com filtros, lançamento manual e edição (tipo, categoria, aplicar às parecidas).
 import { classificadas, excluirTx, mudar, nomeApp, nomeConta, salvarTx, state } from '../app';
 import { SEM_CATEGORIA, type Classificada } from '../core/classificar';
-import { ORIGENS, TIPOS, type TipoTx, type Transacao } from '../core/tipos';
+import { ORIGENS, TIPOS, contaNoTotal, type TipoTx, type Transacao } from '../core/tipos';
 import { arred, hoje, norm, parseValor, termoDe, uid } from '../core/util';
 import { $, esc, fmtD, fmtQuando, opcoes, sinal, toast } from './fmt';
 import { campoCategoria, confirmar, ligarCampoCategoria, valorCampo } from './escolher';
 import { transacaoIgual } from '../core/duplicadas';
 import { definirCategoria } from '../core/sugestoes';
-import { itemTx, listaPorDia, mesAtual, navMes, sobra } from './painel';
+import { itemTx, listaPorDia, mesAtual, navMes, rotaDetalhe, sobra } from './painel';
 import { blocoReembolso, explicarCategoria, ligarReembolso } from './reembolsos';
 import type { Rota } from './nav';
 import { trocar, voltar } from './nav';
@@ -68,6 +68,8 @@ export function telaTx(el: HTMLElement, id: string) {
     <p class="label">${esc(nomeConta(x.conta))}, ${fmtD(x.data)}</p>
     <div class="big">${sinal(x.valor)}</div>
     <p class="frase">${esc(x.desc)}</p>
+    <div class="row">${contaNoTotal(x.t) ? `<button type="button" class="btn small" data-ir="cat/${encodeURIComponent(x.c || SEM_CATEGORIA)}">${esc(x.c || SEM_CATEGORIA)}</button>` : ''}
+      <button type="button" class="btn small" data-ir="${esc(rotaDetalhe({ conta: x.conta }))}">${esc(nomeConta(x.conta))}</button></div>
   </section>` : ''}
   <section class="panel">
     ${x ? '<h2>Editar</h2>' : ''}

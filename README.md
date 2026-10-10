@@ -46,7 +46,15 @@ estão esperando na fila.
 Entradas, saídas e saldo do mês, gastos por categoria, de onde veio o dinheiro, gráfico de 12 meses
 e as contas. **Não contam** como entrada nem saída: caixinha/reserva, Pix e transferências entre
 suas contas, e pagamento de fatura. Compra no crédito conta como gasto **na data da compra**.
-Estorno no cartão desconta do gasto. Toque numa categoria para ver as transações e a média.
+Estorno no cartão desconta do gasto.
+
+Tudo é tocável e abre o **detalhe** daquilo: fatias das roscas (para onde foi, de onde veio),
+a pizza de **como pagou** (Pix, crédito, vale…), lugares de **onde mais gastou**, barras dos
+**dias da semana**, **contas** e os meses do gráfico de 12 meses (abre o mês). O detalhe mostra o
+total do mês, a média dos 11 meses anteriores, as divisões que ainda fazem sentido (por categoria,
+como pagou, por conta, em rosca tocável), 12 meses e as transações do mês. Divisões juntam o
+recorte: no detalhe do Pix, tocar em Mercado abre “Mercado, Pix”. Na transação, a categoria e a
+conta também abrem o detalhe delas.
 
 ### Notificações
 - O serviço guarda as notificações dos **apps monitorados** numa fila no próprio Android, mesmo
@@ -157,8 +165,8 @@ salvos ao mesmo tempo**: os valores do mesmo tipo se somam (Nubank ou Rico) e ti
 combinam (Nubank e Rico, só em Alimentação). **Ajustes → Filtros salvos** cria, edita e exclui. O
 filtro em uso vale até fechar o app.
 
-Tocar em **Entradas** ou **Saídas** no topo do Painel abre a lista do mês, com as setas de mês e a
-troca entre entradas e saídas.
+Tocar em **Entradas** ou **Saídas** no topo do Painel abre a lista do mês, com as setas de mês, a
+troca entre entradas e saídas e a rosca por categoria.
 
 ### Avisos de repetido
 Antes de gravar, o app pergunta se você quer continuar quando:

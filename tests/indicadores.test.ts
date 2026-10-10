@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Classificada } from '../src/core/classificar';
-import { acumulado, formaPagamento, lugares, maioresGastos, porConta, porDiaSemana, porForma, ritmo } from '../src/core/indicadores';
+import { acumulado, formaPagamento, lugares, maioresGastos, porConta, porDiaSemana, porForma, recortar, ritmo, termoLugar } from '../src/core/indicadores';
 import { CONTAS_INICIAIS } from '../src/core/padroes';
 import type { TipoTx } from '../src/core/tipos';
 
@@ -63,5 +63,22 @@ describe('agrupamentos do mês', () => {
     expect(maioresGastos(cls, '2026-10', 2).map(x => x.valor)).toEqual([-100, -50]);
     const l = lugares(cls, '2026-10');
     expect(l.find(x => x.termo === 'cafe exemplo')).toMatchObject({ v: 40, n: 2 });
+  });
+  it('recortes: forma, conta, lugar, dia da semana e categoria, juntos ou sozinhos', () => {
+    const cs = cls.map((x, i) => ({ ...x, c: i === 3 || i === 4 ? 'Mercado' : i === 5 ? 'Salário' : '' }));
+    const ids = (r: Parameters<typeof recortar>[2]) => recortar(cs, contas, r).map(x => x.desc);
+    expect(ids({ forma: 'pix' })).toEqual(['Pix para Fulano', 'Pix para Beltrano']);
+    expect(ids({ forma: 'vale' })).toEqual(['CAFE EXEMPLO 123', 'CAFE EXEMPLO 456']);
+    // Conta: tudo da conta, inclusive entrada e caixinha.
+    expect(ids({ conta: 'mercadopago-conta' })).toHaveLength(4);
+    expect(ids({ lugar: termoLugar('CAFE EXEMPLO 999') })).toHaveLength(2);
+    // Pagamentos com QR de lugares diferentes não se juntam.
+    expect(termoLugar('Pagamento com QR Pix LOJA UM LTDA')).toBe('loja um');
+    expect(termoLugar('Pagamento com QR Pix POSTO DOIS')).toBe('posto dois');
+    expect(ids({ dia: 0 })).toEqual(['Pix para Fulano', 'CAFE EXEMPLO 123', 'CAFE EXEMPLO 456']);
+    expect(ids({ cat: 'Mercado' })).toEqual(['CAFE EXEMPLO 123', 'CAFE EXEMPLO 456']);
+    expect(ids({ cat: 'Salário' })).toEqual(['Salário']);
+    expect(ids({ cat: 'Sem categoria', forma: 'credito' })).toEqual(['Loja A', 'Estorno Loja A']);
+    expect(ids({ dia: 0, forma: 'vale' })).toHaveLength(2);
   });
 });

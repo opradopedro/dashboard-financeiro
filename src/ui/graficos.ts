@@ -1,6 +1,6 @@
 // Gráficos do Painel em SVG (sem biblioteca). Cores das categorias validadas para daltonismo no
 // fundo escuro (6 cores; o resto vai para "outras", em cinza).
-import { brl, compact } from './fmt';
+import { brl, compact, esc } from './fmt';
 
 export const CORES_CAT = ['var(--cat1)', 'var(--cat2)', 'var(--cat3)', 'var(--cat4)', 'var(--cat5)', 'var(--cat6)'];
 export const COR_OUTRAS = 'var(--cat-outras)';
@@ -42,8 +42,8 @@ export function graficoRitmo(el: HTMLElement, atual: number[], dias: number, ant
 
 const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
-/** Gasto por dia da semana, de segunda a domingo; o dia de maior gasto em destaque. */
-export function graficoSemana(el: HTMLElement, s: number[]) {
+/** Gasto por dia da semana, de segunda a domingo; o dia de maior gasto em destaque. Tocar abre o dia. */
+export function graficoSemana(el: HTMLElement, s: number[], ir?: (dia: number) => string) {
   const W = largura(el), H = 120, T = 18, B = 22;
   const ordem = [1, 2, 3, 4, 5, 6, 0];
   const max = Math.max(...s), bw = W / 7, w = Math.min(28, bw * 0.55);
@@ -57,14 +57,42 @@ export function graficoSemana(el: HTMLElement, s: number[]) {
       if (topo) g += `<text x="${(x + w / 2).toFixed(1)}" y="${(y - 6).toFixed(1)}" text-anchor="middle" font-size="10.5" fill="var(--papel)">${compact(v)}</text>`;
     } else g += `<line x1="${x.toFixed(1)}" x2="${(x + w).toFixed(1)}" y1="${H - B - 0.5}" y2="${H - B - 0.5}" stroke="var(--linha-forte)"/>`;
     g += `<text x="${(x + w / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="10.5" fill="${topo ? 'var(--papel)' : 'var(--grafite)'}">${DIAS_CURTOS[d]}</text>`;
+    if (ir && v > 0) g += `<rect x="${(i * bw).toFixed(1)}" y="0" width="${bw.toFixed(1)}" height="${H}" fill="transparent" data-ir="${ir(d)}" class="parte"><title>${DIAS_CURTOS[d]}: ${brl(v)}</title></rect>`;
   });
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Gasto por dia da semana" font-family="inherit">${g}</svg>`;
 }
 
-/** Fita empilhada (parte do todo), com um pequeno vão entre as partes. */
-export function fitaEmpilhada(partes: { v: number; cor: string; rotulo: string }[]) {
-  const total = partes.reduce((a, p) => a + p.v, 0);
+export interface Parte { v: number; cor: string; rotulo: string; ir?: string }
+
+/**
+ * Rosca (ou pizza, com furo = 0): cada parte é tocável e abre o detalhe dela (data-ir). No meio
+ * da rosca, o total e uma legenda curta. Partes pequenas ganham um mínimo para dar para tocar.
+ */
+export function rosca(partes: Parte[], centro?: { valor: string; legenda: string }, opc: { tam?: number; furo?: number } = {}) {
+  const ps = partes.filter(p => p.v > 0.005);
+  const total = ps.reduce((a, p) => a + p.v, 0);
   if (total <= 0) return '';
-  return `<div class="fita-cats" role="img" aria-label="${partes.map(p => `${p.rotulo} ${brl(p.v)}`).join(', ')}">${partes
-    .map(p => `<i style="flex-grow:${(p.v / total * 1000).toFixed(0)};background:${p.cor}"></i>`).join('')}</div>`;
+  const tam = opc.tam ?? 200, furo = opc.furo ?? 0.62;
+  const c = tam / 2, R = c - 2, r = R * furo;
+  // Mínimo de 2% do círculo por parte (o resto encolhe para caber).
+  const min = 0.02, peq = ps.filter(p => p.v / total < min).length;
+  const escalaG = peq ? (1 - peq * min) / ps.filter(p => p.v / total >= min).reduce((a, p) => a + p.v / total, 0) : 1;
+  const ponto = (raio: number, a: number) => `${(c + raio * Math.sin(a)).toFixed(2)},${(c - raio * Math.cos(a)).toFixed(2)}`;
+  const fatia = (a0: number, a1: number) => {
+    const grande = a1 - a0 > Math.PI ? 1 : 0;
+    if (r <= 0) return `M${c},${c}L${ponto(R, a0)}A${R},${R} 0 ${grande} 1 ${ponto(R, a1)}z`;
+    return `M${ponto(R, a0)}A${R},${R} 0 ${grande} 1 ${ponto(R, a1)}L${ponto(r, a1)}A${r},${r} 0 ${grande} 0 ${ponto(r, a0)}z`;
+  };
+  let a = 0, g = '';
+  for (const p of ps) {
+    const f = p.v / total, da = 2 * Math.PI * (f < min ? min : f * escalaG);
+    // Uma parte só: círculo inteiro em duas metades (o arco SVG não fecha sozinho).
+    const d = ps.length === 1 ? fatia(0, Math.PI) + fatia(Math.PI, 2 * Math.PI) : fatia(a, a + da);
+    const titulo = `${p.rotulo}: ${brl(p.v)} (${Math.round(f * 100)}%)`;
+    g += `<path d="${d}" fill="${p.cor}" stroke="var(--fundo-rosca, var(--noite))" stroke-width="${ps.length === 1 ? 0 : 2}" stroke-linejoin="round"${p.ir ? ` data-ir="${p.ir}" class="parte"` : ''}><title>${esc(titulo)}</title></path>`;
+    a += da;
+  }
+  const meio = centro && r > 0 ? `<text x="${c}" y="${c - 2}" text-anchor="middle" pointer-events="none" font-size="${(tam / 13).toFixed(1)}" font-weight="500" fill="var(--papel)">${esc(centro.valor)}</text>
+    <text x="${c}" y="${c + tam / 11}" text-anchor="middle" pointer-events="none" font-size="${(tam / 17).toFixed(1)}" fill="var(--grafite)">${esc(centro.legenda)}</text>` : '';
+  return `<div class="rosca"><svg viewBox="0 0 ${tam} ${tam}" width="${tam}" height="${tam}" role="img" aria-label="${esc(ps.map(p => `${p.rotulo} ${brl(p.v)}`).join(', '))}" font-family="inherit">${g}${meio}</svg></div>`;
 }
