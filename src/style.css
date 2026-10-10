@@ -10,6 +10,8 @@
   --entrada:#3B97C9; --saida:#CF7448;
   /* categorias (validadas para daltonismo neste fundo, nesta ordem) */
   --cat1:#3987e5; --cat2:#d95926; --cat3:#199e70; --cat4:#c98500; --cat5:#d55181; --cat6:#9085e9; --cat-outras:#5d6a80;
+  /* toque tech: só em fios, marcas e brilhos discretos */
+  --tech:#6FC3DF; --tech-fio:rgba(111,195,223,.10);
   --ok:#7CC4A0; --alerta:#E3B65C; --erro:#E8806F; --alerta-fundo:#2B2617;
   --raio-g:22px; --raio-m:16px; --raio-p:12px;
   --sat:var(--safe-area-inset-top,env(safe-area-inset-top,0px));
@@ -21,7 +23,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none !important}
 html{-webkit-text-size-adjust:100%;background:var(--noite)}
-body{margin:0;background:var(--noite);color:var(--papel);font-family:var(--fonte);font-size:15px;line-height:1.5;font-weight:450;
+body{margin:0;background:var(--noite) radial-gradient(rgba(142,154,176,.075) 1px,transparent 1.3px) 0 0/22px 22px;color:var(--papel);font-family:var(--fonte);font-size:15px;line-height:1.5;font-weight:450;
   padding:0 20px calc(104px + var(--sab));font-variant-numeric:tabular-nums;font-feature-settings:"tnum";-webkit-tap-highlight-color:transparent}
 .wrap{max-width:680px;margin-inline:auto;display:flex;flex-direction:column;gap:28px;width:100%}
 h1,h2,h3{margin:0;font-family:var(--titulo);font-weight:600;letter-spacing:-.01em}
@@ -64,6 +66,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .panel{display:flex;flex-direction:column;gap:14px;min-width:0}
 .folha,.panel.folha{background:var(--lousa);border-radius:var(--raio-m);padding:6px 16px}
 .caixa{background:var(--lousa);border-radius:var(--raio-m);padding:16px;display:flex;flex-direction:column;gap:12px}
+/* Superfícies com um fio de luz no alto e borda quase invisível. */
+.folha,.caixa{border:1px solid var(--tech-fio);background-image:linear-gradient(180deg,rgba(111,195,223,.05),rgba(111,195,223,0) 72px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+/* Marca de seção: um ponto aceso antes do título. */
+.panel > h2::before,.panel > .row > h2::before{content:"";display:inline-block;width:6px;height:6px;border-radius:2px;margin-right:10px;
+  vertical-align:middle;transform:translateY(-2px);background:var(--tech);box-shadow:0 0 8px rgba(111,195,223,.7)}
 .big{font-size:clamp(34px,10vw,44px);font-weight:300;line-height:1.05;letter-spacing:-.025em}
 .up{color:var(--papel)} .down{color:var(--papel)}
 .ok{color:var(--ok);font-size:14px} .err{color:var(--erro);font-size:14px} .warn{color:var(--alerta)}
@@ -200,7 +208,7 @@ nav button{position:relative;background:none;border:0;padding:8px 0 4px;font-siz
   display:flex;flex-direction:column;align-items:center;gap:4px}
 nav button svg{width:22px;height:22px}
 nav button[aria-current="page"]{color:var(--champanhe)}
-nav button[aria-current="page"]::before{content:"";position:absolute;top:-7px;left:30%;right:30%;height:2px;border-radius:2px;background:var(--champanhe)}
+nav button[aria-current="page"]::before{content:"";position:absolute;top:-7px;left:30%;right:30%;height:2px;border-radius:2px;background:var(--champanhe);box-shadow:0 0 10px rgba(217,200,164,.65)}
 nav .num{position:absolute;top:4px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--alerta);color:#1A1712;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
 
 #toast{position:fixed;left:20px;right:20px;bottom:calc(88px + var(--sab));margin-inline:auto;max-width:420px;
@@ -254,14 +262,17 @@ dialog.folha-sel::backdrop{background:rgba(6,9,15,.62)}
 @keyframes sobe{from{transform:translateY(24px);opacity:.4}to{transform:none;opacity:1}}
 
 /* ---------- painel: indicadores ---------- */
-.rosca{display:flex;justify-content:center;padding:4px 0}
-.rosca svg{max-width:100%;height:auto;overflow:visible}
-.rosca .parte{transition:transform .12s,opacity .12s}
-.rosca .parte:active{transform:translateY(-3px);opacity:.85}
-.caixa .rosca{--fundo-rosca:var(--lousa)}
+.pizza3d{display:flex;justify-content:center;padding:2px 0}
+.pizza3d svg{max-width:100%;height:auto;overflow:visible}
+/* Fatias juntas fora da tela; ao entrar, abrem um pouco (animarGraficos). Tocar puxa a fatia mais. */
+.pizza3d .fatia{transition:transform .6s cubic-bezier(.2,.9,.25,1.15)}
+.pizza3d.aberta .fatia{transform:translate(var(--dx),var(--dy))}
+.pizza3d.aberta .fatia.parte:active{transform:translate(calc(var(--dx) * 2.2),calc(var(--dy) * 2.2));transition-duration:.15s;transition-delay:0s !important}
+.pizza3d .anel{opacity:0;stroke-dashoffset:40;transition:opacity .8s,stroke-dashoffset 1.4s ease-out}
+.pizza3d.aberta .anel{opacity:.45;stroke-dashoffset:0}
+@media (prefers-reduced-motion:reduce){.pizza3d .fatia,.pizza3d .anel{transition:none}}
 .parte{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .15s}
 .parte:active{opacity:.7}
-path.parte:hover{opacity:.85}
 .tocavel{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tocavel:active{background:var(--lousa-alta)}
 .legenda .traco{width:16px;height:0;border-radius:0;border-top:2.2px solid var(--saida)}

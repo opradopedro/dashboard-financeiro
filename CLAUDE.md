@@ -69,8 +69,8 @@ src/
   dados/db.ts      IndexedDB: um registro 'dados' com tudo, gravado inteiro a cada mudança
   nativo/notificacoes.ts  ponte com o plugin Kotlin (+ imitação para navegador)
   app.ts           estado, mudar() (fila de gravações), consumirFila(), classificadas() com cache
-  ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts, graficos.ts (SVG; rosca()
-                   em 3D, com fatias data-ir e % na fatia), painel.ts (telaDetalhe: rota detalhe?forma=&conta=&lugar=&dia=&cat=; cat/<nome>),
+  ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts, graficos.ts (SVG; pizza() 3D
+                   explodida, fatias data-ir e % na fatia; animarGraficos abre ao entrar na tela), painel.ts (telaDetalhe: rota detalhe?forma=&conta=&lugar=&dia=&cat=; cat/<nome>),
                    escolher.ts (folhas: categoria com busca, opção, confirmar), datas.ts, reembolsos.ts (bloco na transação, lista), filtro.ts (filtro em uso na memória,
                    clsFiltradas, folha, Filtros salvos), novidades.ts, avancado.ts (filtro das notificações + registro)
   novidades.json   histórico de versões + `proxima` (pendentes); gera as notas da Release
@@ -154,6 +154,9 @@ dados: entrada #3B97C9, saída #CF7448 (validadas para daltonismo; verde/vermelh
 Fontes embutidas: Montserrat Alternates (títulos, nome do mês) e Montserrat variável (texto,
 números 300 tabulares). Evitar: rótulos em CAIXA ALTA, “·” como separador, “›”/“→” em botões,
 cartões iguais para tudo. A peça marcante é o topo do Painel (mês grande + frase + fita dupla).
+Toque tech discreto: `--tech` #6FC3DF só em fios, marcas e brilhos (ponto aceso antes do título da
+seção, fio de luz no alto de `.folha`/`.caixa`, grade de pontos no fundo, anel tracejado das
+pizzas). Gráficos de parte do todo são sempre pizza 3D (o dono pediu; nada de rosca).
 
 ## Convenções
 

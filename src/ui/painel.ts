@@ -8,7 +8,7 @@ import { FORMAS, lugares, maioresGastos, porConta, porDiaSemana, porForma, recor
 import { TIPOS, contaNoTotal } from '../core/tipos';
 import { hoje, somaDias, somaMes } from '../core/util';
 import { brl, compact, esc, fmtD, fmtNum, fmtYm, MES, mesLongo, sinal, toast } from './fmt';
-import { COR_OUTRAS, CORES_CAT, graficoRitmo, graficoSemana, rosca } from './graficos';
+import { COR_OUTRAS, CORES_CAT, graficoRitmo, graficoSemana, pizza } from './graficos';
 import { trocar } from './nav';
 import { botaoFiltro, clsFiltradas, filtroAtivo, ligarFiltro, linhaFiltro } from './filtro';
 import { ICONES } from './icones';
@@ -38,13 +38,13 @@ const COR_FORMA: Record<Forma, string> = {
 interface Parte { rotulo: string; v: number; n: number; cor: string; ir: string }
 
 /**
- * Rosca (ou pizza) + lista: cada fatia e cada linha abrem o detalhe daquela parte.
+ * Pizza 3D + lista: cada fatia e cada linha abrem o detalhe daquela parte.
  * `unidade` = singular e plural do que é contado (gasto/gastos, entrada/entradas).
  */
-function blocoPartes(ps: Parte[], total: number, opc: { pizza?: boolean; unidade: [string, string] }) {
+function blocoPartes(ps: Parte[], total: number, opc: { unidade: [string, string] }) {
   if (!ps.length) return '';
   const maior = ps[0].v || 1;
-  const grafico = rosca(ps.map(p => ({ v: p.v, cor: p.cor, rotulo: p.rotulo, ir: p.ir })), opc.pizza ? { furo: 0, larg: 250 } : {});
+  const grafico = pizza(ps.map(p => ({ v: p.v, cor: p.cor, rotulo: p.rotulo, ir: p.ir })));
   return `${grafico}<div class="folha"><div class="list">${ps.map(p => `<button type="button" class="item cat-linha" data-ir="${esc(p.ir)}">
       <div class="name">${esc(p.rotulo)}</div><div class="val">${brl(p.v)}</div>
       <div class="barra"><i style="width:${Math.max(2, p.v / maior * 100).toFixed(1)}%;background:${p.cor}"></i></div>
@@ -238,7 +238,7 @@ export function telaPainel(el: HTMLElement) {
 
   ${formas.length ? `<section class="panel">
     <h2>Como pagou</h2>
-    ${blocoPartes(partesForma(formas, f => rotaDetalhe({ forma: f })), r.saidas, { pizza: true, unidade: ['gasto', 'gastos'] })}
+    ${blocoPartes(partesForma(formas, f => rotaDetalhe({ forma: f })), r.saidas, { unidade: ['gasto', 'gastos'] })}
     <p class="note">Pela conta (cartão = crédito; vale = conta de benefício) e pela descrição (Pix, boleto, transferência). O resto que saiu da conta conta como débito.</p>
   </section>` : ''}
 
@@ -370,7 +370,7 @@ export function telaMovimentos(el: HTMLElement, tipo: string) {
 
 /**
  * Detalhe de qualquer parte do Painel (categoria, forma de pagamento, conta, lugar, dia da
- * semana, ou várias juntas): total do mês, média, as divisões que ainda fazem sentido (em rosca,
+ * semana, ou várias juntas): total do mês, média, as divisões que ainda fazem sentido (em pizza,
  * tocáveis), 12 meses e as transações do mês.
  */
 export function telaDetalhe(el: HTMLElement, rec: Recorte, nome = '') {
@@ -395,7 +395,7 @@ export function telaDetalhe(el: HTMLElement, rec: Recorte, nome = '') {
     secao('Por categoria', r.saidas, blocoPartes(partesCat(r.porCategoria, c => com({ cat: c })), r.saidas, { unidade: ['gasto', 'gastos'] }));
   const formas = porForma(sub, d.contas, mes);
   if (!rec.forma && formas.length > 1)
-    secao('Como pagou', r.saidas, blocoPartes(partesForma(formas, f => com({ forma: f })), r.saidas, { pizza: true, unidade: ['gasto', 'gastos'] }));
+    secao('Como pagou', r.saidas, blocoPartes(partesForma(formas, f => com({ forma: f })), r.saidas, { unidade: ['gasto', 'gastos'] }));
   const contas = porConta(sub, mes);
   if (!rec.conta && contas.length > 1)
     secao('Por conta', r.saidas, blocoPartes(partesConta(contas, c => com({ conta: c })), r.saidas, { unidade: ['gasto', 'gastos'] }));

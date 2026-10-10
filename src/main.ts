@@ -12,6 +12,7 @@ import { ICONES } from './ui/icones';
 import { nativo } from './nativo/notificacoes';
 import { $, $$, toast } from './ui/fmt';
 import { ABAS, aba, ir, rotaAtual, voltar, type Rota } from './ui/nav';
+import { animarGraficos } from './ui/graficos';
 import { telaAvancado } from './ui/avancado';
 import { abrirMes, mudarMes, recorteDe, telaCategoria, telaDetalhe, telaFora, telaMovimentos, telaPainel, telaSemCategoria, tituloRecorte } from './ui/painel';
 import { telaFiltros } from './ui/filtro';
@@ -73,6 +74,7 @@ function render(anim = true) {
   marcarPendencias();
   try { t.render(el, r); } catch (e) { console.error(e); el.innerHTML = `<div class="panel"><div class="err">Erro ao abrir esta tela: ${(e as Error).message}</div></div>`; }
   aplicarSelecao();
+  animarGraficos(el);
   if (anim) { el.classList.remove('anim'); void el.offsetWidth; el.classList.add('anim'); }
   // Telas que mostram o estado do serviço: relê do Android ao abrir (a permissão pode ter mudado lá fora).
   if (anim && (r.nome === 'ajustes' || r.nome === 'boasvindas')) {

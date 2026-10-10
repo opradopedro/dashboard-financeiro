@@ -67,66 +67,80 @@ export interface Parte { v: number; cor: string; rotulo: string; ir?: string }
 let seqGrafico = 0;
 
 /**
- * Rosca (ou pizza, com furo = 0) em 3D: disco inclinado com parede, sombra e brilho; a
- * porcentagem vai escrita na fatia (o 3D engana o tamanho, o número não). Cada fatia (topo e
- * parede) é tocável e abre o detalhe dela (data-ir). Partes pequenas ganham um mínimo para dar
- * para tocar. Ângulo 0 = fundo do disco (meio-dia), no sentido do relógio.
+ * Pizza em 3D: disco inclinado, fatias um pouco separadas (abrem quando o gráfico entra na tela,
+ * ver animarGraficos), parede e cortes com sombra, brilho no topo e um anel tracejado embaixo.
+ * A porcentagem vai escrita na fatia (o 3D engana o tamanho, o número não). Cada fatia é tocável
+ * e abre o detalhe dela (data-ir). Partes pequenas ganham um mínimo para dar para tocar.
+ * Ângulo 0 = fundo do disco (meio-dia), no sentido do relógio.
  */
-export function rosca(partes: Parte[], opc: { larg?: number; furo?: number } = {}) {
+export function pizza(partes: Parte[], opc: { larg?: number } = {}) {
   const ps = partes.filter(p => p.v > 0.005);
   const total = ps.reduce((a, p) => a + p.v, 0);
   if (total <= 0) return '';
-  const W = opc.larg ?? 280, furo = opc.furo ?? 0.5;
-  const R = W / 2 - 6, k = 0.58, ry = R * k, h = R * 0.17, r = R * furo;
-  const cx = W / 2, cy = ry + 6, H = Math.ceil(cy + ry + h + 12);
+  const W = opc.larg ?? 300, R = W / 2 - 22, k = 0.56, ry = R * k, h = R * 0.16, abre = 7;
+  const cx = W / 2, cy = ry + 16, H = Math.ceil(cy + ry + h + 24);
   const id = `g3d${++seqGrafico}`;
-  const P = (raio: number, a: number, dy = 0) => `${(cx + raio * Math.sin(a)).toFixed(2)},${(cy - raio * Math.cos(a) * k + dy).toFixed(2)}`;
-  const arco = (raio: number, a0: number, a1: number, dy = 0, volta = false) =>
-    `A${raio.toFixed(2)},${(raio * k).toFixed(2)} 0 ${Math.abs(a1 - a0) > Math.PI ? 1 : 0} ${volta ? 0 : 1} ${P(raio, volta ? a0 : a1, dy)}`;
-  // Topo da fatia (anel ou cunha).
-  const topo = (a0: number, a1: number) => r > 0
-    ? `M${P(R, a0)}${arco(R, a0, a1)}L${P(r, a1)}${arco(r, a0, a1, 0, true)}z`
-    : `M${cx},${cy}L${P(R, a0)}${arco(R, a0, a1)}z`;
-  // Parede: faixa entre o arco de cima e o mesmo arco h mais abaixo, só no trecho visível.
-  const parede = (raio: number, a0: number, a1: number, de: number, ate: number) => {
-    const b0 = Math.max(a0, de), b1 = Math.min(a1, ate);
-    return b1 - b0 > 0.001 ? `M${P(raio, b0)}${arco(raio, b0, b1)}L${P(raio, b1, h)}${arco(raio, b0, b1, h, true)}z` : '';
+  const n = (v: number) => v.toFixed(2);
+  const P = (raio: number, a: number, dy = 0) => `${n(cx + raio * Math.sin(a))},${n(cy - raio * Math.cos(a) * k + dy)}`;
+  const arco = (a0: number, a1: number, dy = 0, volta = false) =>
+    `A${n(R)},${n(ry)} 0 ${Math.abs(a1 - a0) > Math.PI ? 1 : 0} ${volta ? 0 : 1} ${P(R, volta ? a0 : a1, dy)}`;
+  const topo = (a0: number, a1: number) => `M${cx},${cy}L${P(R, a0)}${arco(a0, a1)}z`;
+  // Parede de fora: só a metade da frente (90° a 270°) aparece.
+  const parede = (a0: number, a1: number) => {
+    const b0 = Math.max(a0, Math.PI / 2), b1 = Math.min(a1, 1.5 * Math.PI);
+    return b1 - b0 > 0.001 ? `M${P(R, b0)}${arco(b0, b1)}L${P(R, b1, h)}${arco(b0, b1, h, true)}z` : '';
   };
+  const borda = (a0: number, a1: number) => {
+    const b0 = Math.max(a0, Math.PI / 2), b1 = Math.min(a1, 1.5 * Math.PI);
+    return b1 - b0 > 0.001 ? `M${P(R, b0)}${arco(b0, b1)}` : '';
+  };
+  // Corte (lado da fatia), visível quando está virado para a frente.
+  const corte = (a: number) => `M${cx},${cy}L${P(R, a)}L${P(R, a, h)}L${cx},${n(cy + h)}z`;
   const min = 0.02, peq = ps.filter(p => p.v / total < min).length;
   const escalaG = peq ? (1 - peq * min) / ps.filter(p => p.v / total >= min).reduce((a, p) => a + p.v / total, 0) : 1;
-  const sep = ps.length > 1 ? 'stroke="var(--fundo-rosca, var(--noite))" stroke-width="1.5" stroke-linejoin="round"' : '';
-  let a = 0, fatias = '', rotulos = '';
-  for (const p of ps) {
-    const f = p.v / total, da = 2 * Math.PI * (f < min ? min : f * escalaG), a1 = a + da;
-    // A parede de fora aparece na metade da frente (90° a 270°); a de dentro, no fundo do furo.
-    const fora = parede(R, a, a1, Math.PI / 2, 1.5 * Math.PI);
-    const dentro = r > 0 ? parede(r, a, a1, 0, Math.PI / 2) + parede(r, a, a1, 1.5 * Math.PI, 2 * Math.PI) : '';
-    const sup = ps.length === 1 ? topo(0, Math.PI) + topo(Math.PI, 2 * Math.PI) : topo(a, a1);
-    const titulo = `${p.rotulo}: ${brl(p.v)} (${Math.round(f * 100)}%)`;
-    fatias += `<g${p.ir ? ` data-ir="${esc(p.ir)}" class="parte"` : ''}><title>${esc(titulo)}</title>`
-      + (dentro ? `<path d="${dentro}" fill="${p.cor}"/><path d="${dentro}" fill="#000" opacity=".5"/>` : '')
-      + (fora ? `<path d="${fora}" fill="${p.cor}" ${sep}/><path d="${fora}" fill="#000" opacity=".3"/>` : '')
-      + `<path d="${sup}" fill="${p.cor}" ${sep}/></g>`;
-    if (f >= 0.05) {
-      const m = a + da / 2, rr = r > 0 ? (R + r) / 2 : R * 0.64;
-      rotulos += `<text x="${(cx + rr * Math.sin(m)).toFixed(1)}" y="${(cy - rr * Math.cos(m) * k + 4).toFixed(1)}" text-anchor="middle" font-size="12.5" font-weight="650" fill="#fff" stroke="rgba(8,12,20,.55)" stroke-width="3" paint-order="stroke" stroke-linejoin="round">${Math.round(f * 100)}%</text>`;
-    }
+  const uma = ps.length === 1;
+  let a = 0;
+  const fatias = ps.map((p, i) => {
+    const f = p.v / total, da = 2 * Math.PI * (f < min ? min : f * escalaG), a0 = a, a1 = a + da, m = a + da / 2;
     a = a1;
-  }
-  // Furo e brilho só no topo (evenodd recorta o furo).
-  const disco = `M${cx - R},${cy}a${R},${ry} 0 1 0 ${2 * R},0a${R},${ry} 0 1 0 ${-2 * R},0z`
-    + (r > 0 ? `M${cx - r},${cy}a${r},${r * k} 0 1 0 ${2 * r},0a${r},${r * k} 0 1 0 ${-2 * r},0z` : '');
-  const faixa = `M${cx - R},${cy}A${R},${ry} 0 0 0 ${cx + R},${cy}L${cx + R},${cy + h}A${R},${ry} 0 0 1 ${cx - R},${cy + h}z`;
-  return `<div class="rosca"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(ps.map(p => `${p.rotulo} ${brl(p.v)}`).join(', '))}" font-family="inherit">
+    return { p, i, f, a0, a1, m };
+  });
+  // Do fundo para a frente: o que está mais perto é desenhado por último.
+  const g = fatias.slice().sort((x, y) => Math.cos(y.m) - Math.cos(x.m)).map(({ p, i, f, a0, a1, m }) => {
+    const cortes = uma ? '' : [Math.cos(a0 - Math.PI / 2) < 0 ? corte(a0) : '', Math.cos(a1 + Math.PI / 2) < 0 ? corte(a1) : ''].join('');
+    const fora = uma ? parede(Math.PI / 2, 1.5 * Math.PI) : parede(a0, a1);
+    const sup = uma ? `M${cx - R},${cy}a${n(R)},${n(ry)} 0 1 0 ${n(2 * R)},0a${n(R)},${n(ry)} 0 1 0 ${n(-2 * R)},0z` : topo(a0, a1);
+    const aro = uma ? borda(Math.PI / 2, 1.5 * Math.PI) : borda(a0, a1);
+    const dx = uma ? 0 : Math.sin(m) * abre, dy = uma ? 0 : -Math.cos(m) * abre * k;
+    const titulo = `${p.rotulo}: ${brl(p.v)} (${Math.round(f * 100)}%)`;
+    const rotulo = f >= 0.05 ? `<text x="${n(cx + R * 0.6 * Math.sin(m))}" y="${n(cy - R * 0.6 * Math.cos(m) * k + 4)}" text-anchor="middle" font-size="12" font-weight="650" fill="#fff" stroke="rgba(8,12,20,.6)" stroke-width="3" paint-order="stroke" stroke-linejoin="round" pointer-events="none">${Math.round(f * 100)}%</text>` : '';
+    return `<g class="fatia${p.ir ? ' parte' : ''}"${p.ir ? ` data-ir="${esc(p.ir)}"` : ''} style="--dx:${n(dx)}px;--dy:${n(dy)}px;transition-delay:${i * 45}ms"><title>${esc(titulo)}</title>`
+      + (cortes ? `<path d="${cortes}" fill="${p.cor}"/><path d="${cortes}" fill="#000" opacity=".42"/>` : '')
+      + (fora ? `<path d="${fora}" fill="${p.cor}"/><path d="${fora}" fill="url(#${id}p)"/>` : '')
+      + `<path d="${sup}" fill="${p.cor}"/><path d="${sup}" fill="url(#${id}b)" pointer-events="none"/>`
+      + (aro ? `<path d="${aro}" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="1" pointer-events="none"/>` : '')
+      + `${rotulo}</g>`;
+  }).join('');
+  const anelR = R + 13;
+  return `<div class="pizza3d"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(ps.map(p => `${p.rotulo} ${brl(p.v)}`).join(', '))}" font-family="inherit">
     <defs>
-      <radialGradient id="${id}s"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
-      <radialGradient id="${id}b" cx=".35" cy=".2" r=".85"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".6" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
-      <linearGradient id="${id}p"><stop offset="0" stop-color="#000" stop-opacity=".35"/><stop offset=".45" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#000" stop-opacity=".4"/></linearGradient>
+      <radialGradient id="${id}s"><stop offset="0" stop-color="#000" stop-opacity=".6"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${id}b" gradientUnits="userSpaceOnUse" cx="${n(cx - R * 0.35)}" cy="${n(cy - ry * 0.6)}" r="${n(R * 1.2)}"><stop offset="0" stop-color="#fff" stop-opacity=".26"/><stop offset=".55" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></radialGradient>
+      <linearGradient id="${id}p" gradientUnits="userSpaceOnUse" x1="${n(cx - R)}" x2="${n(cx + R)}" y1="0" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset=".42" stop-color="#000" stop-opacity=".12"/><stop offset=".6" stop-color="#000" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></linearGradient>
     </defs>
-    <ellipse cx="${cx}" cy="${(cy + h + 3).toFixed(1)}" rx="${(R * 1.04).toFixed(1)}" ry="${(ry * 1.08).toFixed(1)}" fill="url(#${id}s)"/>
-    ${fatias}
-    <path d="${faixa}" fill="url(#${id}p)" pointer-events="none"/>
-    <path d="${disco}" fill="url(#${id}b)" fill-rule="evenodd" pointer-events="none"/>
-    <g pointer-events="none">${rotulos}</g>
+    <ellipse class="anel" cx="${cx}" cy="${n(cy + h + 2)}" rx="${n(anelR)}" ry="${n(anelR * k)}" fill="none" stroke="var(--tech)" stroke-width="1" stroke-dasharray="2 5"/>
+    <ellipse cx="${cx}" cy="${n(cy + h + 4)}" rx="${n(R * 1.05)}" ry="${n(ry * 1.1)}" fill="url(#${id}s)"/>
+    ${g}
   </svg></div>`;
+}
+
+let observador: IntersectionObserver | null = null;
+
+/** Abre as pizzas (fatias separadas) quando entram na tela e fecha quando saem; chamado a cada redesenho. */
+export function animarGraficos(raiz: ParentNode) {
+  const els = Array.from(raiz.querySelectorAll<HTMLElement>('.pizza3d'));
+  if (typeof IntersectionObserver === 'undefined') { els.forEach(e => e.classList.add('aberta')); return; }
+  observador?.disconnect();
+  observador = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle('aberta', e.isIntersecting)), { threshold: 0.55 });
+  els.forEach(e => observador!.observe(e));
 }
