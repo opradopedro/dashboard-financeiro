@@ -161,8 +161,11 @@ Na lista de arquivos, o aviso já aparece em cada arquivo repetido.
 ### Fatura do cartão
 Pagamento de fatura não é gasto nem entrada: cada compra já contou no dia em que foi feita. O
 pagamento que aparece no cartão (“Pagamento recebido”, “Pagamento de fatura”) é ligado ao Pix ou
-débito da sua conta que pagou: **mesmo valor, de 10 dias antes a 5 dias depois** (com dois
-candidatos, vence o que cita o banco do cartão ou “fatura”, depois o mais perto da data). Os dois
+débito da sua conta que pagou, de 10 dias antes a 5 dias depois: primeiro pelo **mesmo valor** (com
+dois candidatos, vence o que cita o banco do cartão ou “fatura”, depois o mais perto da data); se
+não houver, por **valor redondo** (de 70% a 130% da fatura, ou até R$ 100 a mais), só quando o Pix é
+para você mesmo (seu nome, em Ajustes) ou cita o banco do cartão (Rico/XP, Nubank/Nu Pagamentos…).
+A sobra fica na conta do banco e não conta como gasto (é dinheiro seu). Os dois
 ficam como “Pagamento de fatura”. O Painel mostra **Faturas pagas** no mês (cartão, valor, data e o
 Pix que pagou) e a transação mostra a outra ponta.
 

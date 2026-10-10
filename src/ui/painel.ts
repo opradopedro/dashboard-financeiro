@@ -243,6 +243,15 @@ export function telaPainel(el: HTMLElement) {
   }));
 }
 
+/** Pix com valor redondo: o que sobrou na conta do banco do cartão (ou o que faltou e saiu de lá). */
+export function sobra(cc: Classificada, p: Classificada) {
+  const dif = Math.round((Math.abs(p.valor) - Math.abs(cc.valor)) * 100) / 100;
+  const banco = state.dados.contas.find(c => c.id === cc.conta)?.banco || 'do banco';
+  if (Math.abs(dif) < 0.005) return '';
+  return dif > 0 ? `. Mandou ${brl(Math.abs(p.valor))}: sobraram ${brl(dif)} na conta ${esc(banco)}, que continuam seus`
+    : `. Mandou ${brl(Math.abs(p.valor))}: os outros ${brl(-dif)} saíram do que já estava na conta ${esc(banco)}`;
+}
+
 /**
  * Faturas pagas no mês: o pagamento que aparece em cada cartão e, quando o app achou, o Pix ou
  * débito da sua conta que pagou (as duas pontas ficam fora de entradas e gastos).
@@ -255,7 +264,7 @@ function blocoFaturas(cls: Classificada[], mes: string) {
   const itens = doMes.filter(x => cartao(x.conta)).map(cc => {
     const p = cc.par ? porId.get(cc.par) : undefined;
     return `<button type="button" class="item" data-ir="tx/${esc(cc.id)}"><div class="name">${esc(nomeConta(cc.conta))}</div><div class="val">${brl(Math.abs(cc.valor))}</div>
-      <div class="meta">${p ? `Paga em ${fmtD(cc.data)} com ${esc(p.desc)} (${esc(nomeConta(p.conta))}, ${fmtD(p.data)})` : `Paga em ${fmtD(cc.data)}. O Pix ou débito que pagou não está no app.`}</div><div class="meta r"></div></button>`;
+      <div class="meta">${p ? `Paga em ${fmtD(cc.data)} com ${esc(p.desc)} (${esc(nomeConta(p.conta))}, ${fmtD(p.data)})${sobra(cc, p)}.` : `Paga em ${fmtD(cc.data)}. O app não achou o Pix ou débito que pagou${state.dados.config.titular ? '' : ' (se foi um Pix para você mesmo com valor redondo, informe seu nome em Ajustes)'}.`}</div><div class="meta r"></div></button>`;
   });
   // Pagamento na conta sem o lançamento no cartão (ex.: fatura do cartão ainda não importada).
   for (const x of doMes) if (!cartao(x.conta) && !(x.par && porId.has(x.par)) && x.valor < 0)

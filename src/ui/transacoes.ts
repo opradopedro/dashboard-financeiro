@@ -6,7 +6,7 @@ import { arred, hoje, norm, parseValor, termoDe, uid } from '../core/util';
 import { $, esc, fmtD, fmtQuando, opcoes, sinal, toast } from './fmt';
 import { campoCategoria, confirmar, ligarCampoCategoria, valorCampo } from './escolher';
 import { transacaoIgual } from '../core/duplicadas';
-import { itemTx, listaPorDia, mesAtual, navMes } from './painel';
+import { itemTx, listaPorDia, mesAtual, navMes, sobra } from './painel';
 import type { Rota } from './nav';
 import { trocar, voltar } from './nav';
 
@@ -153,8 +153,9 @@ function blocoPar(x: Classificada) {
   if (!p) return '';
   const cartao = state.dados.contas.find(c => c.id === x.conta)?.tipo === 'cartao';
   const titulo = x.t === 'fatura' ? (cartao ? 'Paga com' : 'Pagou a fatura') : 'A outra ponta';
+  const [cc, pix] = cartao ? [x, p] : [p, x];
   const nota = x.t === 'fatura'
-    ? 'As duas ficam fora de entradas e gastos: o gasto já contou em cada compra do cartão.'
+    ? `As duas ficam fora de entradas e gastos: o gasto já contou em cada compra do cartão${sobra(cc, pix)}.`
     : 'Dinheiro seu indo de uma conta sua para outra: não conta como entrada nem gasto.';
   return `<section class="panel"><h2>${titulo}</h2><div class="folha"><div class="list">${itemTx(p, true)}</div></div><p class="note">${nota}</p></section>`;
 }

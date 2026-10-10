@@ -131,3 +131,34 @@ describe('pagamento da fatura ligado ao Pix que pagou', () => {
     expect(cls[2].par).toBeUndefined();
   });
 });
+
+describe('fatura paga com valor redondo', () => {
+  const cs: Conta[] = [...contas, { id: 'rico', nome: 'Rico crédito', banco: 'Rico', tipo: 'cartao', ativa: true }];
+  const titular = 'Fulano de Tal Souza';
+  it('Pix redondo para você mesmo paga a fatura; a sobra não vira gasto', () => {
+    const ts = [tx('mp', '2026-08-26', 'Pix enviado Fulano de Tal Souza', -600), tx('rico', '2026-08-31', 'Pagamento de fatura', 586.65), tx('rico', '2026-08-10', 'LOJA', -586.65)];
+    const cls = classificar(ts, { ...ctx, contas: cs, titular });
+    expect(cls[0].t).toBe('fatura');
+    expect(cls[0].par).toBe(cls[1].id);
+    expect(resumoMes(cls, '2026-08').saidas).toBeCloseTo(586.65);
+  });
+  it('Pix redondo que cita o banco do cartão (sem nome cadastrado)', () => {
+    const ts = [tx('mp', '2026-08-26', 'Pix enviado XP Investimentos', -550), tx('rico', '2026-08-31', 'Pagamento de fatura', 586.65)];
+    const cls = classificar(ts, { ...ctx, contas: cs });
+    expect(cls[0].par).toBe(cls[1].id);
+  });
+  it('Pix redondo para outra pessoa não é a fatura; valor igual tem preferência', () => {
+    const ts = [tx('mp', '2026-08-26', 'Pix enviado Beltrano', -600), tx('rico', '2026-08-31', 'Pagamento de fatura', 586.65)];
+    const cls = classificar(ts, { ...ctx, contas: cs, titular });
+    expect(cls[0].t).toBe('saida');
+    const ts2 = [tx('mp', '2026-08-25', 'Pix enviado Fulano de Tal Souza', -600), tx('mp', '2026-08-29', 'Boleto', -586.65), tx('rico', '2026-08-31', 'Pagamento de fatura', 586.65)];
+    const c2 = classificar(ts2, { ...ctx, contas: cs, titular });
+    expect(c2[1].par).toBe(c2[2].id);
+    expect(c2[0].t).toBe('interna'); // continua sendo dinheiro seu indo para outra conta sua
+  });
+  it('valor muito diferente não liga', () => {
+    const ts = [tx('mp', '2026-08-26', 'Pix enviado Fulano de Tal Souza', -2000), tx('rico', '2026-08-31', 'Pagamento de fatura', 586.65)];
+    const cls = classificar(ts, { ...ctx, contas: cs, titular });
+    expect(cls[1].par).toBeUndefined();
+  });
+});

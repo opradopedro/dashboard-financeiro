@@ -106,7 +106,9 @@ Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INI
   `tipoUsuario` > regra de categoria > `tipo` da regra de notificação > `tipoAuto()` pela descrição.
   Depois junta pares, com `par` apontando a outra ponta: Pix entre contas suas = interna (±3 dias);
   pagamento no cartão (FATURA em qualquer sinal, ou crédito sem explicação) + saída da conta de
-  mesmo valor, de 10 dias antes a 5 depois = fatura (prefere a que cita o banco do cartão).
+  mesmo valor, de 10 dias antes a 5 depois = fatura (prefere a que cita o banco do cartão); sem valor
+  igual, valor redondo (70%–130% ou +R$ 100) se a saída tem o nome do titular ou cita o banco
+  (`APELIDOS`). O dono manda valor redondo quase sempre; a sobra fica na conta do banco.
 - Categoria: `cat` > regra de categoria > palavras-chave (trecho mais longo vence; entrada só em
   categoria de receita) > sem categoria (`''`, exibido “Sem categoria”).
 - Painel conta só `entrada` e `saida`. Estorno no cartão = `saida` com valor positivo.

@@ -7,6 +7,16 @@ import { diasEntre, norm } from './util';
 const CAIXINHA = / (caixinhas?|cofrinhos?|cofre|dinheiro reservado|dinheiro retirado|reservado|reserva por|retirada da reserva|guardado|porquinho|aplicacao|aplic|resgate|cdb|lci|lca|tesouro direto|investimento|fundo de investimento|previdencia) /;
 const FATURA = / (pagamento (da |de )?fatura|pagto fatura|pgto fatura|pagamento cartao|pagamento de cartao|fatura cartao|pagamento recebido|pagamento efetuado|credit card payment) /;
 
+/** Outros nomes com que o banco do cartão aparece na descrição de um Pix. */
+const APELIDOS: Record<string, string[]> = {
+  rico: ['rico', 'xp', 'xp investimentos'],
+  nubank: ['nubank', 'nu pagamentos', 'nu financeira'],
+  'mercado pago': ['mercado pago', 'mercadopago'],
+  itau: ['itau', 'itau unibanco'],
+  inter: ['inter', 'banco inter'],
+  c6: ['c6', 'c6 bank'],
+};
+
 /** Pix/transferência de você para você mesmo: o nome do titular (2 primeiras palavras e a última) aparece na descrição. */
 export function ehTitular(desc: string, titular: string): boolean {
   const p = norm(titular).trim().split(' ').filter(x => x.length > 1);
@@ -64,7 +74,8 @@ export interface Contexto { contas: Conta[]; categorias: Categoria[]; regrasCat:
 /**
  * Classifica todas as transações. Além do tipo de cada uma, junta pares: o mesmo valor saindo de
  * uma conta sua e entrando em outra conta sua em até 3 dias é transferência interna; o pagamento
- * da fatura no cartão casa com o Pix/débito de mesmo valor na conta (10 dias antes a 5 depois).
+ * da fatura no cartão casa com o Pix/débito que o pagou (mesmo valor, ou valor redondo para você
+ * mesmo ou para o banco do cartão; 10 dias antes a 5 depois).
  */
 export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
   const tipoConta = new Map(ctx.contas.map(c => [c.id, c.tipo]));
@@ -92,23 +103,36 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
     const s = livres.find(x => !usados.has(x) && x.valor < 0 && x.conta !== e.conta && Math.abs(x.valor + e.valor) < 0.005 && diasEntre(x.data, e.data) <= 3);
     if (s) { e.t = 'interna'; s.t = 'interna'; e.par = s.id; s.par = e.id; usados.add(e); usados.add(s); }
   }
-  // Pagamento da fatura: o pagamento que aparece no cartão casa com a saída da sua conta de mesmo
-  // valor (o Pix ou débito que você fez para pagar), de 10 dias antes até 5 dias depois.
-  // Os dois ficam fora de entradas e gastos: o gasto já contou em cada compra.
+  // Pagamento da fatura: o pagamento que aparece no cartão casa com a saída da sua conta que o
+  // pagou (o Pix ou débito), de 10 dias antes até 5 dias depois. Os dois ficam fora de entradas e
+  // gastos: o gasto já contou em cada compra.
+  // 1º) mesmo valor; 2º) valor redondo (a sobra fica na conta do banco do cartão, ou a falta sai do
+  // que já estava lá): só se a saída for para você mesmo (seu nome) ou citar o banco do cartão.
   const ehCartao = (x: Classificada) => tipoConta.get(x.conta) === 'cartao';
-  const nomesBanco = new Map(ctx.contas.map(c => [c.id, norm(c.banco).trim()]));
+  const bancoDe = new Map(ctx.contas.map(c => [c.id, norm(c.banco).trim()]));
   const pagamentos = out.filter(x => ehCartao(x) && (x.t === 'fatura' || (x.valor > 0 && x.auto && !x.tipo))).sort((a, b) => a.data.localeCompare(b.data));
+  const antes = (cc: Classificada, x: Classificada) => (Date.parse(cc.data) - Date.parse(x.data)) / 864e5;
+  const podePagar = (cc: Classificada, x: Classificada) => !usados.has(x) && !ehCartao(x) && x.valor < 0
+    && antes(cc, x) <= 10 && antes(cc, x) >= -5 && (x.t === 'fatura' || (x.auto && (x.t === 'saida' || x.t === 'interna')));
+  const citaBanco = (cc: Classificada, x: Classificada) => {
+    const d = norm(x.desc), b = bancoDe.get(cc.conta) || '';
+    return / fatura /.test(d) || (!!b && (APELIDOS[b] || [b]).some(a => d.includes(` ${a} `)));
+  };
+  const ligar = (cc: Classificada, p: Classificada) => { p.t = 'fatura'; cc.t = 'fatura'; p.par = cc.id; cc.par = p.id; usados.add(p); usados.add(cc); };
   for (const cc of pagamentos) {
-    const v = Math.abs(cc.valor), banco = nomesBanco.get(cc.conta) || '';
-    const antes = (x: Classificada) => (Date.parse(cc.data) - Date.parse(x.data)) / 864e5;
-    const cands = out.filter(x => !usados.has(x) && !ehCartao(x) && x.valor < 0 && Math.abs(-x.valor - v) < 0.005
-      && antes(x) <= 10 && antes(x) >= -5 && (x.t === 'fatura' || (x.auto && (x.t === 'saida' || x.t === 'interna'))));
+    const v = Math.abs(cc.valor);
+    const cands = out.filter(x => podePagar(cc, x) && Math.abs(-x.valor - v) < 0.005);
     if (!cands.length) continue;
-    // Preferência: a que cita o banco do cartão ou "fatura"; depois, a mais perto da data.
-    const cita = (x: Classificada) => (banco && norm(x.desc).includes(` ${banco} `)) || / fatura /.test(norm(x.desc));
-    const p = cands.sort((a, b) => Number(cita(b)) - Number(cita(a)) || Math.abs(antes(a)) - Math.abs(antes(b)))[0];
-    p.t = 'fatura'; cc.t = 'fatura'; p.par = cc.id; cc.par = p.id;
-    usados.add(p); usados.add(cc);
+    // Com dois de mesmo valor, vence o que cita o banco do cartão ou "fatura"; depois, o mais perto da data.
+    ligar(cc, cands.sort((a, b) => Number(citaBanco(cc, b)) - Number(citaBanco(cc, a)) || Math.abs(antes(cc, a)) - Math.abs(antes(cc, b)))[0]);
+  }
+  for (const cc of pagamentos) {
+    if (usados.has(cc)) continue;
+    const v = Math.abs(cc.valor);
+    const cands = out.filter(x => podePagar(cc, x) && (citaBanco(cc, x) || (!!ctx.titular && ehTitular(x.desc, ctx.titular)))
+      && -x.valor >= v * 0.7 && -x.valor <= Math.max(v * 1.3, v + 100));
+    if (!cands.length) continue;
+    ligar(cc, cands.sort((a, b) => Math.abs(-a.valor - v) - Math.abs(-b.valor - v) || Math.abs(antes(cc, a)) - Math.abs(antes(cc, b)))[0]);
   }
   return out;
 }
