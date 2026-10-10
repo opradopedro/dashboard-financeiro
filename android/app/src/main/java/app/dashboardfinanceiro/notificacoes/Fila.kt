@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
+import java.text.Normalizer
 import java.util.UUID
 import java.util.regex.Pattern
 
@@ -150,10 +151,37 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
     private class RegraNativa(val pacote: String, val padrao: Pattern?, val acao: String)
     @Volatile private var cacheRegras: List<RegraNativa>? = null
 
-    /** Recebe do app as regras ativas já em ordem de prioridade, os nomes dos apps e o modo dos avisos. */
-    fun definirRegras(regras: JSONArray, nomes: JSONObject, modo: String) {
-        prefs.edit().putString(REGRAS, regras.toString()).putString(NOMES, nomes.toString()).putString(MODO, modo).apply()
+    /**
+     * Recebe do app as regras ativas já em ordem de prioridade, os nomes dos apps, o modo dos avisos
+     * e o filtro que vale antes das regras ({exigirValor, palavras}).
+     */
+    fun definirRegras(regras: JSONArray, nomes: JSONObject, modo: String, filtro: JSONObject?) {
+        val e = prefs.edit().putString(REGRAS, regras.toString()).putString(NOMES, nomes.toString()).putString(MODO, modo)
+        if (filtro != null) e.putString(FILTRO, filtro.toString())
+        e.apply()
         cacheRegras = null
+        cacheFiltro = null
+    }
+
+    // ---- Filtro antes das regras (mesma lógica de filtrarNotif em src/core/regras.ts) ----
+
+    private class FiltroNativo(val exigirValor: Boolean, val palavras: List<String>)
+    @Volatile private var cacheFiltro: FiltroNativo? = null
+
+    private fun filtro(): FiltroNativo = cacheFiltro ?: run {
+        // Sem filtro enviado ainda (app não abriu depois de atualizar): o padrão do app.
+        val o = try { JSONObject(prefs.getString(FILTRO, null) ?: "{}") } catch (_: Exception) { JSONObject() }
+        val arr = o.optJSONArray("palavras")
+        val palavras = if (arr == null) listOf("empréstimo") else (0 until arr.length()).map { arr.optString(it) }
+        FiltroNativo(o.optBoolean("exigirValor", true), palavras.map { normalizar(it) }.filter { it.isNotEmpty() })
+    }.also { cacheFiltro = it }
+
+    /** true = ignorar antes das regras: tem uma palavra da lista, ou não fala de dinheiro ($ ou reais). */
+    private fun filtrada(t: String): Boolean {
+        val f = filtro()
+        val n = " ${normalizar(t)} "
+        if (f.palavras.any { n.contains(it) }) return true
+        return f.exigirValor && !VALOR.containsMatchIn(t)
     }
 
     fun modoAvisos(): String = prefs.getString(MODO, null) ?: "sem-regra"
@@ -175,6 +203,7 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
     /** O que a primeira regra que casar faria: "ignorar", um tipo de transação, ou null (sem regra). */
     fun avaliar(pacote: String, titulo: String, texto: String): String? {
         val t = titulo.trim() + "\n" + texto.trim()
+        if (filtrada(t)) return "ignorar"
         for (r in regras()) if (r.pacote == pacote && r.padrao?.matcher(t)?.find() == true) return r.acao
         return null
     }
@@ -187,6 +216,13 @@ class Fila private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "fila_notif
         private const val REGRAS = "regras"
         private const val NOMES = "nomes"
         private const val MODO = "modoAvisos"
+        private const val FILTRO = "filtroNotif"
+        private val VALOR = Regex("\\$|\\breais\\b", RegexOption.IGNORE_CASE)
+        private val ACENTOS = Regex("\\p{Mn}+")
+        private val NAO_ALFANUM = Regex("[^a-z0-9&]+")
+        /** Igual a norm() do app: sem acento, minúsculas, só letras e números separados por espaço. */
+        fun normalizar(s: String): String =
+            NAO_ALFANUM.replace(ACENTOS.replace(Normalizer.normalize(s, Normalizer.Form.NFD), "").lowercase(), " ").trim()
         private const val TRINTA_DIAS = 30L * 24 * 60 * 60 * 1000
         /** Repostagem do mesmo id com o mesmo texto dentro deste intervalo é a mesma notificação. */
         private const val REPOST_MS = 2L * 60 * 1000

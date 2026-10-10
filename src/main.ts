@@ -12,6 +12,7 @@ import { ICONES } from './ui/icones';
 import { nativo } from './nativo/notificacoes';
 import { $, $$, toast } from './ui/fmt';
 import { ABAS, aba, ir, rotaAtual, voltar, type Rota } from './ui/nav';
+import { telaAvancado } from './ui/avancado';
 import { abrirMes, mudarMes, recorteDe, telaCategoria, telaDetalhe, telaFora, telaMovimentos, telaPainel, telaSemCategoria, tituloRecorte } from './ui/painel';
 import { telaFiltros } from './ui/filtro';
 import { telaReembolsos } from './ui/reembolsos';
@@ -56,6 +57,7 @@ const TELAS: Record<string, Tela> = {
   regrascat: { titulo: 'Regras', render: el => telaRegras(el, { nome: 'regras', params: [], query: new URLSearchParams('tipo=cat') }), vivo: true },
   dados: { titulo: 'Dados', render: el => telaDados(el) },
   novidades: { titulo: 'Novidades', render: el => telaNovidades(el) },
+  avancado: { titulo: 'Avançado', render: el => telaAvancado(el), vivo: true },
   boasvindas: { titulo: 'Permissões', render: el => telaBoasVindas(el), vivo: true },
 };
 

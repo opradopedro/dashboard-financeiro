@@ -123,7 +123,10 @@ export const REGRAS_INICIAIS: RegraNotif[] = ([
 ] as Base[]).map(regra);
 
 /** Versão atual dos dados (ver migracoes.ts). */
-export const VERSAO_DADOS = 4;
+export const VERSAO_DADOS = 5;
+
+/** Filtro inicial das notificações: só as que falam de dinheiro; empréstimo nunca. */
+export const FILTRO_NOTIF_INICIAL = { exigirValor: true, palavras: ['empréstimo'] };
 
 export function dadosIniciais(): Dados {
   return {
@@ -139,6 +142,6 @@ export function dadosIniciais(): Dados {
     revisoes: [],
     importacoes: [],
     excluidas: [],
-    config: { boasVindasVista: false, titular: '', avisos: 'sem-regra', versaoDados: VERSAO_DADOS },
+    config: { boasVindasVista: false, titular: '', avisos: 'sem-regra', filtroNotif: { ...FILTRO_NOTIF_INICIAL, palavras: [...FILTRO_NOTIF_INICIAL.palavras] }, versaoDados: VERSAO_DADOS },
   };
 }

@@ -52,7 +52,11 @@ function v4(d: Dados): Dados {
   return { ...d, categorias };
 }
 
-const PASSOS: [number, (d: Dados) => Dados][] = [[2, v2], [3, v3], [4, v4]];
+/** v4 → v5: filtro antes das regras (config.filtroNotif, vem do sanear). Nada a mudar: as sem
+ *  regra são reprocessadas depois de migrar e as propagandas sem valor saem dos pendentes. */
+const v5 = (d: Dados) => d;
+
+const PASSOS: [number, (d: Dados) => Dados][] = [[2, v2], [3, v3], [4, v4], [5, v5]];
 
 /** Leva os dados até a versão atual. Depois de migrar, as notificações sem regra são reprocessadas. */
 export function migrar(d: Dados): { dados: Dados; migrou: boolean } {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { receber, reprocessar } from '../src/core/ingestao';
+import { filtrarNotif, motivoFiltro } from '../src/core/regras';
+import { migrar } from '../src/core/migracoes';
 import { dadosIniciais } from '../src/core/padroes';
 import { importarLinhas, chavesDasLinhas } from '../src/core/juntar';
 import type { Dados } from '../src/core/tipos';
@@ -46,5 +48,37 @@ describe('notificação → transação', () => {
     expect(r.dados.txs).toHaveLength(1);
     expect(r.dados.txs[0].desc).toBe('PADARIA X LTDA');
     expect(r.dados.txs[0].origens.map(o => o.tipo)).toEqual(['extrato', 'notificacao']);
+  });
+});
+
+describe('filtro antes das regras (Ajustes → Avançado)', () => {
+  const promo = item('p1', 'br.com.rico.mobile', '⭐10/10 com Cartão Rico⭐', 'Ofertas turbinadas em grandes parceiros, somente neste fim de semana, confira e aproveite antes que termine!');
+  it('sem valor ($ ou reais) é ignorada pelo filtro e não vira pendência', () => {
+    const r = receber(dadosIniciais(), [promo]);
+    expect(r.dados.notifs[0]).toMatchObject({ status: 'ignorada', filtro: 'valor' });
+    expect(r.dados.notifs[0].regra).toBeUndefined();
+    expect(filtrarNotif({ titulo: 'Pix', texto: 'Você recebeu 50 reais de Fulano' }, dadosIniciais().config.filtroNotif)).toBeNull();
+    expect(filtrarNotif({ titulo: 'Compra', texto: 'US$ 12,00 em LOJA' }, dadosIniciais().config.filtroNotif)).toBeNull();
+  });
+  it('empréstimo é sempre ignorado, mesmo com valor e regra (com ou sem acento)', () => {
+    const r = receber(dadosIniciais(), [item('e1', 'com.nu.production', 'Empréstimo', 'Você tem R$ 5.000,00 de empréstimo pré-aprovado'),
+      item('e2', 'com.nu.production', 'Oferta', 'Compra de R$ 52,00 APROVADA em EMPRESTIMOS X.')]);
+    expect(r.dados.notifs.map(n => [n.status, n.filtro])).toEqual([['ignorada', 'palavra:empréstimo'], ['ignorada', 'palavra:empréstimo']]);
+    expect(r.dados.txs).toHaveLength(0);
+    expect(motivoFiltro('palavra:empréstimo')).toBe('tem “empréstimo”');
+  });
+  it('desligado: volta a passar pelas regras; reprocessar tira a marca do filtro', () => {
+    let d = receber(dadosIniciais(), [promo]).dados;
+    d = { ...d, config: { ...d.config, filtroNotif: { exigirValor: false, palavras: [] } } };
+    d = reprocessar(d, ['p1']);
+    expect(d.notifs[0].status).toBe('sem-regra');
+    expect(d.notifs[0].filtro).toBeUndefined();
+  });
+  it('ao atualizar (dados v4), as propagandas que estavam sem regra passam pelo filtro', () => {
+    const d0 = dadosIniciais();
+    d0.config.versaoDados = 4;
+    d0.notifs = [{ id: 'p1', pacote: 'br.com.rico.mobile', titulo: promo.titulo, texto: promo.texto, quando, status: 'sem-regra' }];
+    const m = migrar(d0);
+    expect(m.dados.notifs[0]).toMatchObject({ status: 'ignorada', filtro: 'valor' });
   });
 });

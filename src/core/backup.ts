@@ -1,7 +1,7 @@
 // Backup e restauração por arquivo: tudo do app num JSON. Também usado para validar o que vem do
 // banco local (dados de versões antigas ganham os campos novos com os valores iniciais).
 import type { Dados } from './tipos';
-import { dadosIniciais, REGRAS_INICIAIS } from './padroes';
+import { dadosIniciais, FILTRO_NOTIF_INICIAL, REGRAS_INICIAIS } from './padroes';
 import { TIPOS } from './tipos';
 
 export const APP_BACKUP = 'dashboard-financeiro';
@@ -45,7 +45,8 @@ export function sanear(x: unknown): Dados {
       .map(n => ({ id: str(n.id), pacote: str(n.pacote), titulo: str(n.titulo), texto: str(n.texto), quando: num(n.quando),
         status: (['transacao', 'ignorada', 'sem-regra', 'erro'].includes(str(n.status)) ? n.status : 'sem-regra') as Dados['notifs'][0]['status'],
         ...(typeof n.regra === 'string' ? { regra: n.regra } : {}), ...(typeof n.tx === 'string' ? { tx: n.tx } : {}),
-        ...(typeof n.erro === 'string' ? { erro: n.erro } : {}), ...(n.simulada ? { simulada: true } : {}) })),
+        ...(typeof n.erro === 'string' ? { erro: n.erro } : {}), ...(n.simulada ? { simulada: true } : {}),
+        ...(typeof n.filtro === 'string' && n.filtro ? { filtro: n.filtro } : {}) })),
     apps: tem('apps') ? arr(o.apps).filter(a => typeof a.pacote === 'string' && a.pacote)
       .map(a => ({ pacote: str(a.pacote).trim(), nome: str(a.nome, str(a.pacote)), ativo: a.ativo !== false,
         ...(typeof a.conta === 'string' && a.conta ? { conta: a.conta } : {}) })) : ini.apps,
@@ -90,6 +91,12 @@ export function sanear(x: unknown): Dados {
         boasVindasVista: !!c.boasVindasVista,
         titular: str(c.titular).slice(0, 120),
         avisos: (['sem-regra', 'todas', 'nunca'].includes(str(c.avisos)) ? c.avisos : 'sem-regra') as Dados['config']['avisos'],
+        filtroNotif: (() => {
+          const f = c.filtroNotif as Obj | undefined;
+          if (!f || typeof f !== 'object') return { ...FILTRO_NOTIF_INICIAL, palavras: [...FILTRO_NOTIF_INICIAL.palavras] };
+          const ps = Array.isArray(f.palavras) ? (f.palavras as unknown[]).filter((p): p is string => typeof p === 'string' && !!p.trim()).map(p => p.trim().slice(0, 60)) : [];
+          return { exigirValor: f.exigirValor !== false, palavras: [...new Set(ps)].slice(0, 100) };
+        })(),
         // Dados antigos (sem versão) são da versão 1; migracoes.ts leva até a atual.
         versaoDados: Number.isInteger(c.versaoDados) ? c.versaoDados as number : 1,
       };

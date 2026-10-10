@@ -100,7 +100,7 @@ class NotificacoesPlugin : Plugin() {
     fun definirRegras(call: PluginCall) {
         try {
             val regras = call.getArray("regras") ?: return call.reject("Faltou a lista de regras.")
-            fila().definirRegras(regras, call.getObject("nomes") ?: JSONObject(), call.getString("modo") ?: "sem-regra")
+            fila().definirRegras(regras, call.getObject("nomes") ?: JSONObject(), call.getString("modo") ?: "sem-regra", call.getObject("filtro"))
             call.resolve()
         } catch (e: Exception) {
             call.reject("Falha no Android: ${e.message}")

@@ -115,7 +115,7 @@ describe('migração v1 → v2', () => {
     expect(d.notifs.map(x => x.status)).toEqual(['sem-regra', 'sem-regra']);
     const m = migrar(d);
     expect(m.migrou).toBe(true);
-    expect(m.dados.config.versaoDados).toBe(4);
+    expect(m.dados.config.versaoDados).toBe(5);
     // v3: categoria de entrada Voucher, logo depois de Rendimentos.
     const nomes = m.dados.categorias.map(c => c.nome);
     expect(nomes.indexOf('Voucher')).toBe(nomes.indexOf('Rendimentos') + 1);

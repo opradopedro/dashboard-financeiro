@@ -60,6 +60,7 @@ export function telaAjustes(el: HTMLElement) {
        ['contas', 'Contas', `${d.contas.length} contas`], ['categorias', 'Categorias e palavras-chave', `${d.categorias.length} categorias`],
        ['filtros', 'Filtros salvos', `${d.filtros.length === 1 ? '1 filtro' : `${d.filtros.length} filtros`} do Painel`],
        ['dados', 'Backup, restauração e exportação', 'Arquivo do app e finai-banco/1'],
+       ['avancado', 'Avançado', `Filtro das notificações e registro do que o app leu`],
        ['boasvindas', 'Guia de permissões', 'Notificações, avisos e bateria'],
        ['novidades', 'Novidades', `O que mudou em cada versão`]]
       .map(([r, t, s]) => `<button type="button" class="item" data-ir="${r}"><div class="name">${t}</div><div class="val"></div><div class="meta">${s}</div><div class="meta r"></div></button>`).join('')}

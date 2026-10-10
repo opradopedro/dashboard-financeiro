@@ -1,8 +1,8 @@
 // Regras de notificação: texto da notificação → transação. Uma regra é uma expressão regular com
 // grupos nomeados: valor (obrigatório), desc e data (opcionais). A regra de maior prioridade que
 // casar decide; se ela for "ignorar", a notificação fica registrada como ignorada.
-import type { AcaoRegra, Conta, RegraNotif, TipoTx } from './tipos';
-import { arred, dataLocal, parseValor } from './util';
+import type { AcaoRegra, Conta, FiltroNotif, RegraNotif, TipoTx } from './tipos';
+import { arred, dataLocal, norm, parseValor } from './util';
 
 export interface NotifEntrada { pacote: string; titulo: string; texto: string; quando: number }
 
@@ -87,6 +87,21 @@ export function processar(n: NotifEntrada, regras: RegraNotif[], contas: Conta[]
   }
   return erro || { status: 'sem-regra' };
 }
+
+/**
+ * Filtro antes das regras (o Android faz o mesmo em Fila.kt para não avisar): devolve o motivo
+ * para ignorar ('palavra:<p>' se tem uma palavra da lista; 'valor' se não fala de dinheiro, sem
+ * "$" nem "reais") ou null se a notificação segue para as regras.
+ */
+export function filtrarNotif(n: Pick<NotifEntrada, 'titulo' | 'texto'>, f: FiltroNotif): string | null {
+  const t = textoNotif(n), tn = norm(t);
+  for (const p of f.palavras) { const pn = norm(p).trim(); if (pn && tn.includes(pn)) return `palavra:${p}`; }
+  if (f.exigirValor && !/\$|\breais\b/i.test(t)) return 'valor';
+  return null;
+}
+
+/** O motivo do filtro em palavras. */
+export const motivoFiltro = (m: string) => (m === 'valor' ? 'não fala de valor (sem “$” nem “reais”)' : `tem “${m.replace(/^palavra:/, '')}”`);
 
 /** Sentido padrão para cada ação (o editor preenche e você pode trocar). */
 export const sentidoPadrao = (a: AcaoRegra): 'sai' | 'entra' => (a === 'entrada' ? 'entra' : 'sai');

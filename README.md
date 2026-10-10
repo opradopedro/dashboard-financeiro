@@ -64,8 +64,14 @@ conta também abrem o detalhe delas.
   *ignorada*, *sem regra*, *erro na regra*). Toque numa para **criar regra a partir dela** ou
   **reprocessar**.
 - **Simular notificação**: escolha o app, título e texto; ela entra pela mesma fila e regras das reais.
-- **Propagandas e avisos que não são compra** (cashback, novidades, limite) também ficam no
-  registro, como *sem regra*, mas **não viram transação**.
+- **Filtro antes das regras** (Ajustes → Avançado): por padrão, notificação que não fala de
+  dinheiro (sem “$”, como R$ ou US$, nem “reais”) e qualquer uma com **empréstimo** é ignorada
+  antes das regras, sem aviso e sem virar transação. Fica no registro como *filtrada*, com o
+  motivo. Dá para desligar a exigência de valor e editar as palavras; ao mudar, as pendentes e as
+  filtradas passam de novo. O Android aplica o mesmo filtro para decidir o aviso.
+- **Registro** (Ajustes → Avançado, ou a aba Notificações): tudo o que os apps monitorados
+  notificaram, com o que aconteceu (virou transação, filtrada, ignorada por regra, sem regra) e
+  por quê. Guarda as 5.000 mais recentes.
 
 ### Avisos com Ignorar e Adicionar
 Quando chega uma notificação de app monitorado que **ainda não tem regra**, o app mostra um aviso

@@ -1,6 +1,6 @@
 // Caminho único de toda notificação (real ou simulada): fila nativa → registro → regras → transação.
-import type { Dados, Notificacao, Transacao } from './tipos';
-import { processar } from './regras';
+import type { Dados, FiltroNotif, Notificacao, Transacao } from './tipos';
+import { filtrarNotif, processar } from './regras';
 import { correspondenteDoExtrato } from './juntar';
 import { uid } from './util';
 
@@ -11,9 +11,12 @@ export interface ItemFila { chave: string; pacote: string; titulo: string; texto
 export const MAX_NOTIFS = 5000;
 
 /** Passa uma notificação pelas regras e cria (ou liga) a transação. Não altera os arrays recebidos. */
-export function aplicarNotif(d: Pick<Dados, 'txs' | 'regras' | 'contas'>, n: Notificacao): { txs: Transacao[]; notif: Notificacao } {
+export function aplicarNotif(d: Pick<Dados, 'txs' | 'regras' | 'contas'> & { filtro?: FiltroNotif }, n: Notificacao): { txs: Transacao[]; notif: Notificacao } {
+  // Filtro de Ajustes → Avançado: propaganda sem valor, empréstimo… nem passa pelas regras.
+  const motivo = d.filtro ? filtrarNotif(n, d.filtro) : null;
+  if (motivo) return { txs: d.txs, notif: { ...n, status: 'ignorada', regra: undefined, tx: undefined, erro: undefined, filtro: motivo } };
   const res = processar(n, d.regras, d.contas);
-  const base: Notificacao = { ...n, status: res.status, regra: undefined, tx: undefined, erro: undefined };
+  const base: Notificacao = { ...n, status: res.status, regra: undefined, tx: undefined, erro: undefined, filtro: undefined };
   if (res.status === 'sem-regra') return { txs: d.txs, notif: base };
   if (res.status === 'erro') return { txs: d.txs, notif: { ...base, regra: res.regra.id, erro: res.erro } };
   if (res.status === 'ignorada') return { txs: d.txs, notif: { ...base, regra: res.regra.id } };
@@ -42,7 +45,7 @@ export function receber(d: Dados, itens: ItemFila[]): { dados: Dados; novas: Not
     if (vistas.has(it.chave) || !monitorados.has(it.pacote)) continue;
     vistas.add(it.chave);
     const n0: Notificacao = { id: it.chave, pacote: it.pacote, titulo: it.titulo || '', texto: it.texto || '', quando: it.quando, status: 'sem-regra', ...(it.simulada ? { simulada: true } : {}) };
-    const r = aplicarNotif({ txs, regras: d.regras, contas: d.contas }, n0);
+    const r = aplicarNotif({ txs, regras: d.regras, contas: d.contas, filtro: d.config.filtroNotif }, n0);
     txs = r.txs;
     novas.push(r.notif);
   }
@@ -71,7 +74,7 @@ export function reprocessar(d: Dados, ids: string[]): Dados {
           ...(antiga.cat ? { cat: antiga.cat } : {}), ...(antiga.nota ? { nota: antiga.nota } : {}) };
       }
     }
-    const r = aplicarNotif({ txs, regras: d.regras, contas: d.contas }, n);
+    const r = aplicarNotif({ txs, regras: d.regras, contas: d.contas, filtro: d.config.filtroNotif }, n);
     txs = r.txs;
     if (manter && r.notif.tx && r.notif.status === 'transacao') {
       const novoId = r.notif.tx;

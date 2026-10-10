@@ -2,6 +2,7 @@
 // No navegador (desenvolvimento), uma imitação em memória faz o mesmo papel, inclusive o filtro de pacotes.
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import type { ItemFila } from '../core/ingestao';
+import type { FiltroNotif } from '../core/tipos';
 
 export interface EstadoNativo {
   acessoPermitido: boolean;
@@ -29,7 +30,7 @@ interface PluginNotificacoes {
   lerFila(): Promise<{ itens: ItemNativo[] }>;
   confirmar(o: { ids: number[] }): Promise<void>;
   simular(o: { pacote: string; titulo: string; texto: string }): Promise<{ aceita: boolean; chave?: string }>;
-  definirRegras(o: { regras: RegraParaNativo[]; nomes: Record<string, string>; modo: string }): Promise<void>;
+  definirRegras(o: { regras: RegraParaNativo[]; nomes: Record<string, string>; modo: string; filtro: FiltroNotif }): Promise<void>;
   lerDecisoes(): Promise<{ itens: DecisaoNativa[] }>;
   confirmarDecisoes(o: { ids: number[] }): Promise<void>;
   cancelarAvisos(o: { chaves: string[] }): Promise<void>;

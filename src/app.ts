@@ -74,10 +74,11 @@ export async function sincronizarNativo() {
   const regras = d.apps.flatMap(a => regrasDoApp(d.regras, a.pacote)).map(r => ({ pacote: r.pacote, padrao: r.padrao, acao: r.acao }));
   const nomes = Object.fromEntries(d.apps.map(a => [a.pacote, a.nome]));
   const pacotes = d.apps.filter(a => a.ativo).map(a => a.pacote);
-  const chave = JSON.stringify([regras, nomes, pacotes, d.config.avisos]);
+  const filtro = d.config.filtroNotif;
+  const chave = JSON.stringify([regras, nomes, pacotes, d.config.avisos, filtro]);
   if (chave === ultimoEnvio) return;
   await nativo.definirPacotes({ pacotes });
-  await nativo.definirRegras({ regras, nomes, modo: d.config.avisos });
+  await nativo.definirRegras({ regras, nomes, modo: d.config.avisos, filtro });
   ultimoEnvio = chave;
 }
 
@@ -111,7 +112,8 @@ export function consumirFila(): Promise<number> {
       const { itens } = await nativo.lerFila();
       let novas = 0;
       if (itens.length) {
-        await mudar(d => { const r = receber(d, itens); novas = r.novas.length; return r.dados; });
+        // As filtradas (propaganda, empréstimo…) entram no registro sem contar como novas.
+        await mudar(d => { const r = receber(d, itens); novas = r.novas.filter(n => !n.filtro).length; return r.dados; });
         await nativo.confirmar({ ids: itens.map(i => i.id) });
       }
       // Botões tocados nos avisos com o app fechado (depois da fila: a notificação já está registrada).

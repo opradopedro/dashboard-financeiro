@@ -5,7 +5,9 @@
     "Mudar várias transações de uma vez: em qualquer lista, toque e segure numa transação e marque outras (ou todas); a barra embaixo muda categoria, tipo ou conta, inverte o sinal ou exclui.",
     "Reembolso e gasto ligados dividem a categoria: mudar em um muda no outro, e as duas telas mostram o vínculo.",
     "Toque em qualquer parte do Painel para ver o detalhe: fatias dos gráficos de rosca e pizza (categorias, como pagou), Pix, crédito, vale, contas, lugares, dias da semana e meses do gráfico. O detalhe mostra total, média, divisões em rosca (também tocáveis), 12 meses e as transações; na transação, a categoria e a conta também abrem o detalhe.",
-    "“Onde mais gastou” separa cada lugar pago com QR Pix (antes juntava todos em “Pagamento com QR Pix”)."
+    "“Onde mais gastou” separa cada lugar pago com QR Pix (antes juntava todos em “Pagamento com QR Pix”).",
+    "Notificações sem valor (propaganda, novidade: sem “$” nem “reais”) e qualquer uma com “empréstimo” são ignoradas antes das regras: não viram transação nem aviso. Dá para mudar em Ajustes → Avançado, inclusive acrescentar palavras.",
+    "Ajustes → Avançado: registro de tudo o que o app leu dos bancos, com o que aconteceu com cada notificação (virou transação, filtrada, ignorada, sem regra) e o motivo."
   ],
   "versoes": [
     {

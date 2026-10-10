@@ -1,7 +1,8 @@
 // Registro de notificações capturadas, detalhe (adicionar, ignorar, criar regra, reprocessar) e simulador.
 import { consumirFila, decidir, nomeApp, reprocessarNotifs, state } from '../app';
 import { gerarRegraAuto } from '../core/automatica';
-import { ACOES, STATUS_NOTIF, type StatusNotif } from '../core/tipos';
+import { ACOES, STATUS_NOTIF, type Notificacao, type StatusNotif } from '../core/tipos';
+import { motivoFiltro } from '../core/regras';
 import { nativo } from '../nativo/notificacoes';
 import { $, esc, fmtQuando, opcoes, sinal, toast } from './fmt';
 import { ir, trocar, type Rota } from './nav';
@@ -9,27 +10,32 @@ import { ir, trocar, type Rota } from './nav';
 const corStatus: Record<StatusNotif, string> = { transacao: 'ok', ignorada: 'muted', 'sem-regra': 'warn', erro: 'err' };
 const tagStatus = (s: StatusNotif) => `<span class="tag ${corStatus[s]}">${STATUS_NOTIF[s]}</span>`;
 
-const FILTROS: [string, string][] = [['', 'Todas'], ['sem-regra', 'Sem regra'], ['transacao', 'Viraram transação'], ['ignorada', 'Ignoradas']];
+const FILTROS: [string, string][] = [['', 'Todas'], ['sem-regra', 'Sem regra'], ['transacao', 'Viraram transação'], ['ignorada', 'Ignoradas'], ['filtrada', 'Filtradas']];
+const tagDe = (n: Notificacao) => (n.filtro ? '<span class="tag muted">Filtrada</span>' : tagStatus(n.status));
+/** Status do filtro da lista: "ignorada" = por regra; "filtrada" = pelo filtro de Ajustes → Avançado. */
+const passaStatus = (n: Notificacao, s: string) => !s || (s === 'filtrada' ? !!n.filtro
+  : s === 'ignorada' ? n.status === 'ignorada' && !n.filtro : n.status === s || (s === 'sem-regra' && n.status === 'erro'));
 
 export function telaNotificacoes(el: HTMLElement, r: Rota) {
   const d = state.dados;
   const status = r.query.get('status') || '';
   const app = r.query.get('app') || '';
-  const lista = d.notifs.filter(n => (!status || n.status === status || (status === 'sem-regra' && n.status === 'erro')) && (!app || n.pacote === app)).slice().reverse();
+  const lista = d.notifs.filter(n => passaStatus(n, status) && (!app || n.pacote === app)).slice().reverse();
   const semRegra = d.notifs.filter(n => n.status === 'sem-regra' || n.status === 'erro');
   const q = (s: string, a = app) => { const p = new URLSearchParams(); if (s) p.set('status', s); if (a) p.set('app', a); return p.toString() ? '?' + p : ''; };
   el.innerHTML = `<section class="panel">
-    <p class="sub">Tudo o que os apps monitorados notificaram, com o texto como chegou. Propagandas e avisos sem valor ficam aqui como “sem regra” e não viram transação. Notificações de outros apps nem são lidas.</p>
+    <p class="sub">Tudo o que os apps monitorados notificaram, com o texto como chegou e o que aconteceu com cada uma. Propagandas sem valor e empréstimo ficam como “filtrada” (Ajustes → Avançado) e não viram transação nem aviso. Notificações de outros apps nem são lidas.</p>
     <div class="row">
       <button type="button" class="btn small" data-ir="regras">Regras</button>
       <button type="button" class="btn small" data-ir="simular">Simular notificação</button>
+      <button type="button" class="btn small" data-ir="avancado">Filtro</button>
       ${semRegra.length ? `<button type="button" class="btn small" id="btnReprocTodas">Reprocessar as sem regra</button>` : ''}
     </div>
   </section>
   <div class="seg" role="group" aria-label="Filtrar por status">${FILTROS.map(([v, t]) => `<button type="button" data-filtro="${v}" aria-pressed="${v === status}">${t}</button>`).join('')}</div>
   <div class="seg" role="group" aria-label="Filtrar por app"><button type="button" data-app="" aria-pressed="${!app}">Todos os apps</button>${d.apps.map(a => `<button type="button" data-app="${esc(a.pacote)}" aria-pressed="${a.pacote === app}">${esc(a.nome)}</button>`).join('')}</div>
   <div class="folha"><div class="list">${lista.slice(0, 300).map(n => `<button type="button" class="item" data-ir="notif/${encodeURIComponent(n.id)}">
-      <div class="name">${esc(n.titulo || 'Sem título')}</div><div class="val">${tagStatus(n.status)}</div>
+      <div class="name">${esc(n.titulo || 'Sem título')}</div><div class="val">${tagDe(n)}</div>
       <div class="meta clamp">${esc(n.texto)}</div>
       <div class="meta r">${esc(nomeApp(n.pacote))}${n.simulada ? ', simulada' : ''}<br>${fmtQuando(n.quando)}</div></button>`).join('')
       || '<div class="empty">Nenhuma notificação por aqui. Assim que um app monitorado notificar, ela aparece nesta lista, mesmo com o app fechado.</div>'}</div></div>`;
@@ -53,8 +59,9 @@ export function telaNotif(el: HTMLElement, id: string) {
   el.innerHTML = `<section class="panel">
     <p class="label">${esc(nomeApp(n.pacote))}, ${fmtQuando(n.quando)}${n.simulada ? ', simulada' : ''}</p>
     <div class="bruto"><b>${esc(n.titulo)}</b>\n${esc(n.texto)}</div>
-    <div class="row">${tagStatus(n.status)}${regra ? `<a href="#/regra/${encodeURIComponent(regra.id)}" data-ir="regra/${esc(regra.id)}" class="sub">pela regra ${esc(regra.nome)}</a>` : ''}</div>
+    <div class="row">${tagDe(n)}${regra ? `<a href="#/regra/${encodeURIComponent(regra.id)}" data-ir="regra/${esc(regra.id)}" class="sub">pela regra ${esc(regra.nome)}</a>` : ''}</div>
     ${n.erro ? `<p class="err">${esc(n.erro)}</p>` : ''}
+    ${n.filtro ? `<p class="sub">Ignorada pelo filtro antes das regras: ${esc(motivoFiltro(n.filtro))}. Se devia ter virado transação, mude o filtro em <a href="#/avancado" data-ir="avancado">Ajustes → Avançado</a>.</p>` : ''}
     ${tx ? `<div class="folha"><button type="button" class="item" data-ir="tx/${esc(tx.id)}"><div class="name">${esc(tx.desc)}</div><div class="val">${sinal(tx.valor)}</div><div class="meta">Transação criada</div><div class="meta r"></div></button></div>`
       : n.tx ? '<p class="note">A transação desta notificação foi excluída.</p>' : ''}
   </section>
@@ -108,6 +115,6 @@ export function telaSimular(el: HTMLElement) {
     if (!aceita) { toast('O serviço recusou: este app não está na lista monitorada.'); return; }
     await consumirFila();
     const n = state.dados.notifs.find(x => x.id === chave) || [...state.dados.notifs].reverse().find(x => x.simulada && x.pacote === pacote);
-    if (n) { toast(`Enviada: ${STATUS_NOTIF[n.status].toLowerCase()}.`); trocar('notificacoes'); ir(`notif/${encodeURIComponent(n.id)}`); }
+    if (n) { toast(`Enviada: ${n.filtro ? 'filtrada' : STATUS_NOTIF[n.status].toLowerCase()}.`); trocar('notificacoes'); ir(`notif/${encodeURIComponent(n.id)}`); }
   };
 }

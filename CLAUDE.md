@@ -54,7 +54,7 @@ src/
                    (termoLugar = contraparte), recortar() (detalhe: forma/conta/lugar/dia/cat juntos)
     regras.ts      regra de notificação → transação (regex com grupos valor/desc/data)
     automatica.ts  botões Adicionar/Ignorar: gerarRegraAuto, gerarRegraIgnorar, aplicarDecisoes
-    migracoes.ts   versões dos dados (v2: Flash, regras reais; v3: categoria Voucher); regras-v1.json = regras padrão da v1
+    migracoes.ts   versões dos dados (v2: Flash, regras reais; v3: categoria Voucher; v5: filtro, reprocessa pendentes); regras-v1.json = regras padrão da v1
     ingestao.ts    fila → registro → regras → transação; reprocessar
     juntar.ts      deduplicação de extrato, revisão, conferência mensal
     aprender.ts    aprende com escolhas suas: contraparte() + Bayes ingênuo (categoria) e tipo
@@ -72,7 +72,7 @@ src/
   ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts, graficos.ts (SVG; rosca()
                    com fatias data-ir), painel.ts (telaDetalhe: rota detalhe?forma=&conta=&lugar=&dia=&cat=; cat/<nome>),
                    escolher.ts (folhas: categoria com busca, opção, confirmar), datas.ts, reembolsos.ts (bloco na transação, lista), filtro.ts (filtro em uso na memória,
-                   clsFiltradas, folha, Filtros salvos), novidades.ts
+                   clsFiltradas, folha, Filtros salvos), novidades.ts, avancado.ts (filtro das notificações + registro)
   novidades.json   histórico de versões + `proxima` (pendentes); gera as notas da Release
   main.ts          tabela de telas, navegação por data-ir/data-aba, inicialização
 android/           projeto Capacitor versionado
@@ -93,7 +93,10 @@ android/           projeto Capacitor versionado
 2. O app (ao abrir, ao voltar para frente, ou no aviso) chama `consumirFila()`: `lerFila` →
    `receber()` (ignora chaves conhecidas e apps não monitorados) → grava no IndexedDB →
    `confirmar(ids)` apaga da fila nativa. Falha no meio = itens continuam na fila, sem duplicar.
-3. `receber` cria a `Notificacao` (registro, com texto bruto) e chama `aplicarNotif`: regras do
+3. `receber` cria a `Notificacao` (registro, com texto bruto) e chama `aplicarNotif`: primeiro o
+   filtro `config.filtroNotif` (`filtrarNotif` em regras.ts: sem "$"/"reais" ou com palavra da lista
+   → ignorada com `filtro`, sem passar pelas regras; `Fila.filtrada()` faz o mesmo no Android para o
+   aviso; padrão = exigir valor + "empréstimo"); depois as regras do
    pacote por prioridade; `ignorar` → status ignorada; senão cria `Transacao` com origem
    notificação (ou liga a uma transação de extrato já existente).
 4. O simulador chama `nativo.simular`, que usa o mesmo `Fila.registrar` (mesmo filtro).

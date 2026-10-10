@@ -8,6 +8,8 @@ describe('backup', () => {
     const d = receber(dadosIniciais(), [{ chave: 'k', pacote: 'com.nu.production', titulo: 'Compra', texto: 'Compra de R$ 1,00 APROVADA em X.', quando: Date.now() }]).dados;
     d.config.boasVindasVista = true;
     d.contas[0].saldoRef = { valor: 10, data: '2026-10-01' };
+    d.config.filtroNotif = { exigirValor: false, palavras: ['empréstimo', 'consórcio'] };
+    d.notifs = [...d.notifs, { id: 'p', pacote: 'br.com.rico.mobile', titulo: 'Oferta', texto: 'Confira', quando: 1, status: 'ignorada', filtro: 'valor' }];
     d.filtros = [{ id: 'f1', nome: 'Cartões no Pix', contas: ['nubank-cartao'], formas: ['pix'], cats: ['Mercado'] }];
     const volta = lerBackup(JSON.stringify(montarBackup(d)));
     expect(volta).toEqual(d);
@@ -21,5 +23,7 @@ describe('backup', () => {
     expect(d.txs).toHaveLength(1);
     expect(d.contas).toHaveLength(5);
     expect(d.regras.length).toBeGreaterThan(5);
+    // Sem filtro guardado (dados antigos): o filtro inicial, ligado.
+    expect(d.config.filtroNotif).toEqual({ exigirValor: true, palavras: ['empréstimo'] });
   });
 });

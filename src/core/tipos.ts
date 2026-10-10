@@ -81,6 +81,8 @@ export interface Notificacao {
   tx?: string;         // id da transação criada/ligada
   erro?: string;
   simulada?: boolean;
+  /** Ignorada pelo filtro de Ajustes → Avançado, antes das regras: 'valor' (sem $ nem reais) ou 'palavra:<p>'. */
+  filtro?: string;
 }
 
 export interface AppMonitorado {
@@ -170,11 +172,16 @@ export const MODOS_AVISOS: Record<ModoAvisos, string> = {
   nunca: 'Não avisar',
 };
 
+/** Notificação sem valor ($ ou reais) ou com uma destas palavras é ignorada antes das regras. */
+export interface FiltroNotif { exigirValor: boolean; palavras: string[] }
+
 export interface Config {
   boasVindasVista: boolean;
   /** Seu nome como aparece nos bancos: Pix de/para você mesmo vira transferência interna. */
   titular: string;
   avisos: ModoAvisos;
+  /** Filtro antes das regras (vale também para o aviso do Android). */
+  filtroNotif: FiltroNotif;
   /** Versão dos dados (migrações em migracoes.ts). */
   versaoDados: number;
 }
