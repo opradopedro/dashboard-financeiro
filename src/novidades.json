@@ -1,20 +1,25 @@
 {
-  "proxima": [
-    "Fatura paga com o valor arredondado: o Pix com a fatura arredondada em reais (ex.: fatura de R$ 1.118,30 paga com R$ 1.118, 1.119 ou 1.120) é ligado ao pagamento; com seu nome ou o banco do cartão na descrição, aceita até 15% de diferença. A sobra que fica na conta do banco não conta como gasto.",
-    "Aviso de repetido: antes de importar um arquivo que já foi importado (ou linhas iguais às de outro extrato), lançar uma entrada ou saída igual a uma que já existe, ou criar regra ou conta igual, o app pergunta “Já existe … exatamente como essa. Deseja continuar?”.",
-    "Arquivos já importados: toque para ver as linhas; marque algumas (ou todas) e mude categoria ou tipo, inverta o sinal ou exclua de uma vez.",
-    "Na importação, a lista de linhas tem as mesmas ações antes de importar, mostra como cada linha vai entrar (ex.: pagamento de fatura) e o resumo não soma pagamento de fatura como entrada.",
-    "Fatura de cartão com o sinal trocado (compras positivas, como na Rico) é acertada sozinha, mesmo com modelo salvo; arquivo já importado assim mostra um botão para inverter tudo.",
-    "O Pix ou débito que você manda para pagar a fatura é ligado ao pagamento no cartão (mesmo valor, até 10 dias antes): os dois ficam fora de entradas e gastos. O Painel mostra as faturas pagas no mês e cada transação mostra a outra ponta.",
-    "Painel com mais gráficos: ritmo do mês (gasto acumulado dia a dia, comparado ao mês anterior e com a projeção até o fim do mês), cores por categoria, como pagou (Pix, crédito, débito, vale), maiores gastos, onde mais gastou, dias da semana e gasto por conta.",
-    "Pagamento de fatura não aparece mais na frase do topo do Painel (continua fora de entradas e saídas).",
-    "Escolher categoria agora abre uma lista com busca: ela filtra enquanto você digita e, se não achar, oferece “+ Adicionar categoria”.",
-    "Importar vários arquivos de uma vez: o app reconhece de qual banco é cada um (Nubank, Rico, Flash, Mercado Pago e OFX de qualquer banco) e já escolhe a conta.",
-    "Arquivo de banco sem conta no app (ex.: Itaú): botão para criar a conta na hora.",
-    "O formato de cada arquivo importado fica salvo; da próxima vez ele é reconhecido mesmo sem ser de um banco conhecido.",
-    "Ajustes > Novidades: histórico do que mudou em cada versão."
-  ],
+  "proxima": [],
   "versoes": [
+    {
+      "versao": "1.7",
+      "data": "2026-10-10",
+      "itens": [
+        "Fatura paga com o valor arredondado: o Pix com a fatura arredondada em reais (ex.: fatura de R$ 1.118,30 paga com R$ 1.118, 1.119 ou 1.120) é ligado ao pagamento; com seu nome ou o banco do cartão na descrição, aceita até 15% de diferença. A sobra que fica na conta do banco não conta como gasto.",
+        "Aviso de repetido: antes de importar um arquivo que já foi importado (ou linhas iguais às de outro extrato), lançar uma entrada ou saída igual a uma que já existe, ou criar regra ou conta igual, o app pergunta “Já existe … exatamente como essa. Deseja continuar?”.",
+        "Arquivos já importados: toque para ver as linhas; marque algumas (ou todas) e mude categoria ou tipo, inverta o sinal ou exclua de uma vez.",
+        "Na importação, a lista de linhas tem as mesmas ações antes de importar, mostra como cada linha vai entrar (ex.: pagamento de fatura) e o resumo não soma pagamento de fatura como entrada.",
+        "Fatura de cartão com o sinal trocado (compras positivas, como na Rico) é acertada sozinha, mesmo com modelo salvo; arquivo já importado assim mostra um botão para inverter tudo.",
+        "O Pix ou débito que você manda para pagar a fatura é ligado ao pagamento no cartão (mesmo valor, até 10 dias antes): os dois ficam fora de entradas e gastos. O Painel mostra as faturas pagas no mês e cada transação mostra a outra ponta.",
+        "Painel com mais gráficos: ritmo do mês (gasto acumulado dia a dia, comparado ao mês anterior e com a projeção até o fim do mês), cores por categoria, como pagou (Pix, crédito, débito, vale), maiores gastos, onde mais gastou, dias da semana e gasto por conta.",
+        "Pagamento de fatura não aparece mais na frase do topo do Painel (continua fora de entradas e saídas).",
+        "Escolher categoria agora abre uma lista com busca: ela filtra enquanto você digita e, se não achar, oferece “+ Adicionar categoria”.",
+        "Importar vários arquivos de uma vez: o app reconhece de qual banco é cada um (Nubank, Rico, Flash, Mercado Pago e OFX de qualquer banco) e já escolhe a conta.",
+        "Arquivo de banco sem conta no app (ex.: Itaú): botão para criar a conta na hora.",
+        "O formato de cada arquivo importado fica salvo; da próxima vez ele é reconhecido mesmo sem ser de um banco conhecido.",
+        "Ajustes > Novidades: histórico do que mudou em cada versão."
+      ]
+    },
     {
       "versao": "1.6",
       "data": "2026-10-10",
