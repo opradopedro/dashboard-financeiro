@@ -57,6 +57,7 @@ src/
     ingestao.ts    fila → registro → regras → transação; reprocessar
     juntar.ts      deduplicação de extrato, revisão, conferência mensal
     duplicadas.ts  avisos antes de gravar: importação repetida, linhas iguais de outro extrato, tx igual
+    filtros.ts     filtro do Painel (contas, formas, categorias): juntarFiltros (união por campo), filtrar
     finai.ts       exportar/ler finai-banco/1
     backup.ts      backup/restauração e sanear() (valida dados do banco local e de backups)
   importar/        detectar.ts (banco/conta do arquivo: modelo salvo > formato > nome), csv.ts, ofx.ts, pdf.ts (pdf.js; tabela Data/Descrição/ID/Valor/Saldo), planilha.ts
@@ -65,7 +66,8 @@ src/
   nativo/notificacoes.ts  ponte com o plugin Kotlin (+ imitação para navegador)
   app.ts           estado, mudar() (fila de gravações), consumirFila(), classificadas() com cache
   ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts, graficos.ts (SVG),
-                   escolher.ts (folhas: categoria com busca, opção, confirmar), datas.ts, novidades.ts
+                   escolher.ts (folhas: categoria com busca, opção, confirmar), datas.ts, filtro.ts (filtro em uso na memória,
+                   clsFiltradas, folha, Filtros salvos), novidades.ts
   novidades.json   histórico de versões + `proxima` (pendentes); gera as notas da Release
   main.ts          tabela de telas, navegação por data-ir/data-aba, inicialização
 android/           projeto Capacitor versionado

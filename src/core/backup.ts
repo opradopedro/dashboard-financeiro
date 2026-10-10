@@ -77,6 +77,11 @@ export function sanear(x: unknown): Dados {
       .map(i => ({ id: str(i.id), arquivo: str(i.arquivo), conta: str(i.conta), em: str(i.em), de: str(i.de), ate: str(i.ate),
         novas: Number(i.novas) || 0, unidas: Number(i.unidas) || 0, revisao: Number(i.revisao) || 0, repetidas: Number(i.repetidas) || 0 })),
     excluidas: Array.isArray(o.excluidas) ? o.excluidas.filter((k): k is string => typeof k === 'string') : [],
+    filtros: arr(o.filtros).filter(f => typeof f.id === 'string' && typeof f.nome === 'string')
+      .map(f => {
+        const lista = (k: string) => (Array.isArray(f[k]) ? (f[k] as unknown[]).filter((v): v is string => typeof v === 'string') : []);
+        return { id: str(f.id), nome: str(f.nome).slice(0, 60), contas: lista('contas'), formas: lista('formas'), cats: lista('cats') };
+      }),
     config: (() => {
       const c = (o.config || {}) as Obj;
       return {

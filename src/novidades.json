@@ -1,5 +1,7 @@
 {
   "proxima": [
+    "Tocar em Entradas ou Saídas no topo do Painel abre a lista de todas as entradas (ou saídas) do mês, com troca de mês e um botão para alternar entre as duas.",
+    "Filtro no Painel (ícone ao lado do mês): escolha contas, formas de pagamento e categorias; salve como filtro com nome; use vários filtros salvos ao mesmo tempo. Ajustes > Filtros salvos para criar, editar ou excluir.",
     "Faturas pagas corrigidas: estorno no cartão não é mais tratado como pagamento, compra na Flash (vale) nunca paga fatura e compra em loja não é confundida com o Pix da fatura. Cada fatura aparece no mês dos gastos dela (paga dia 05/10 = fatura de setembro).",
     "Datas sempre em dd/mm/aaaa, mesmo com o celular em outro idioma: dá para digitar só os números (as barras entram sozinhas) ou tocar no calendário, no mesmo visual das listas.",
     "Ao importar vários arquivos e alguns já tiverem sido importados: botão em destaque “Importar novos” (deixa os repetidos de fora) e “Importar todos”, sem destaque.",

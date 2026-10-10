@@ -129,6 +129,7 @@ export function dadosIniciais(): Dados {
     regras: REGRAS_INICIAIS.map(r => ({ ...r })),
     categorias: CATEGORIAS_INICIAIS.map(c => ({ ...c, palavras: [...c.palavras] })),
     regrasCat: [],
+    filtros: [],
     modelos: [],
     revisoes: [],
     importacoes: [],

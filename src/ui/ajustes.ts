@@ -55,6 +55,7 @@ export function telaAjustes(el: HTMLElement) {
   <div class="folha"><div class="list">
     ${[['apps', 'Apps monitorados', `${d.apps.filter(a => a.ativo).length} ativos`], ['regras', 'Regras', `${d.regras.length} de notificação, ${d.regrasCat.length} de categoria`],
        ['contas', 'Contas', `${d.contas.length} contas`], ['categorias', 'Categorias e palavras-chave', `${d.categorias.length} categorias`],
+       ['filtros', 'Filtros salvos', `${d.filtros.length === 1 ? '1 filtro' : `${d.filtros.length} filtros`} do Painel`],
        ['dados', 'Backup, restauração e exportação', 'Arquivo do app e finai-banco/1'],
        ['boasvindas', 'Guia de permissões', 'Notificações, avisos e bateria'],
        ['novidades', 'Novidades', `O que mudou em cada versão`]]

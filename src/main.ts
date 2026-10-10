@@ -12,7 +12,8 @@ import { ICONES } from './ui/icones';
 import { nativo } from './nativo/notificacoes';
 import { $, $$, toast } from './ui/fmt';
 import { ABAS, aba, ir, rotaAtual, voltar, type Rota } from './ui/nav';
-import { mudarMes, telaCategoria, telaFora, telaPainel, telaSemCategoria } from './ui/painel';
+import { mudarMes, telaCategoria, telaFora, telaMovimentos, telaPainel, telaSemCategoria } from './ui/painel';
+import { telaFiltros } from './ui/filtro';
 import { telaTransacoes, telaTx } from './ui/transacoes';
 import { telaNotif, telaNotificacoes, telaSimular } from './ui/notificacoes';
 import { telaRegra, telaRegras } from './ui/regras';
@@ -32,6 +33,8 @@ const TELAS: Record<string, Tela> = {
   importar: { titulo: 'Importar', render: el => telaImportar(el) },
   ajustes: { titulo: 'Ajustes', render: el => telaAjustes(el), vivo: true },
   tx: { titulo: r => (r.params[0] === 'novo' ? 'Lançar' : 'Transação'), render: (el, r) => telaTx(el, r.params[0]) },
+  movimentos: { titulo: r => (r.params[0] === 'entrada' ? 'Entradas' : 'Saídas'), render: (el, r) => telaMovimentos(el, r.params[0]), vivo: true },
+  filtros: { titulo: 'Filtros salvos', render: el => telaFiltros(el), vivo: true },
   cat: { titulo: r => r.params[0], render: (el, r) => telaCategoria(el, r.params[0]), vivo: true },
   semcat: { titulo: 'Sem categoria', render: el => telaSemCategoria(el), vivo: true },
   fora: { titulo: 'Não contam', render: el => telaFora(el), vivo: true },

@@ -148,6 +148,18 @@ do movimento mais recente.
 - **Conferência mensal** (por conta): o que bateu, o que só está no extrato e o que só veio por
   notificação/manual.
 
+### Filtros do Painel
+O ícone de filtro ao lado do mês abre as escolhas: **contas**, **forma de pagamento** (Pix, crédito,
+débito, vale…, só para gastos) e **categorias**. Tudo no Painel passa a mostrar só o que passa no
+filtro (totais, gráficos, contas, faturas), e também a lista de entradas/saídas e a de cada
+categoria. **Salvar estas escolhas como filtro** guarda com um nome; dá para usar **vários filtros
+salvos ao mesmo tempo**: os valores do mesmo tipo se somam (Nubank ou Rico) e tipos diferentes se
+combinam (Nubank e Rico, só em Alimentação). **Ajustes → Filtros salvos** cria, edita e exclui. O
+filtro em uso vale até fechar o app.
+
+Tocar em **Entradas** ou **Saídas** no topo do Painel abre a lista do mês, com as setas de mês e a
+troca entre entradas e saídas.
+
 ### Avisos de repetido
 Antes de gravar, o app pergunta se você quer continuar quando:
 - o **arquivo já foi importado** (mesma conta, mesmo período, todas as linhas conhecidas: “Já

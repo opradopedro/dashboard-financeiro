@@ -175,6 +175,10 @@ export interface Config {
   versaoDados: number;
 }
 
+/** Filtro do Painel (campo vazio = sem restrição). `formas`: chaves de FORMAS (indicadores.ts). */
+export interface Filtro { contas: string[]; formas: string[]; cats: string[] }
+export interface FiltroSalvo extends Filtro { id: string; nome: string }
+
 export interface Dados {
   contas: Conta[];
   txs: Transacao[];
@@ -188,5 +192,7 @@ export interface Dados {
   importacoes: Importacao[];
   /** Chaves de linhas de extrato cujas transações você excluiu (reimportar não traz de volta). */
   excluidas: string[];
+  /** Filtros salvos do Painel. */
+  filtros: FiltroSalvo[];
   config: Config;
 }

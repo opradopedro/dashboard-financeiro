@@ -7,6 +7,8 @@ import { TIPOS, contaNoTotal } from '../core/tipos';
 import { hoje, somaDias, somaMes } from '../core/util';
 import { brl, compact, esc, fmtD, fmtNum, fmtYm, MES, mesLongo, sinal } from './fmt';
 import { COR_OUTRAS, CORES_CAT, fitaEmpilhada, graficoRitmo, graficoSemana } from './graficos';
+import { trocar } from './nav';
+import { botaoFiltro, clsFiltradas, filtroAtivo, ligarFiltro, linhaFiltro } from './filtro';
 import { ICONES } from './icones';
 
 // Mês aberto nas telas (só na memória: ao abrir o app, volta para o mês atual).
@@ -87,12 +89,12 @@ export function graficoMeses(el: HTMLElement, s: { mes: string; entradas: number
 }
 
 /** Cabeçalho de mês: o nome do mês é o título da tela. */
-export function navMes(mes: string) {
+export function navMes(mes: string, extra = '') {
   const fim = hoje().slice(0, 7);
   const nome = mesLongo(mes).split(' de ');
   return `<div class="fita-mes">
     <h2>${nome[0]}${nome[1] !== fim.slice(0, 4) ? `<small>${nome[1]}</small>` : ''}</h2>
-    <div class="setas">
+    <div class="setas">${extra}
       <button type="button" data-mes-mudar="-1" aria-label="Mês anterior">${ICONES.antes}</button>
       <button type="button" data-mes-mudar="1" aria-label="Próximo mês"${mes >= fim ? ' disabled' : ''}>${ICONES.depois}</button>
     </div>
@@ -101,7 +103,8 @@ export function navMes(mes: string) {
 
 export function telaPainel(el: HTMLElement) {
   const d = state.dados;
-  const cls = classificadas();
+  const cls = clsFiltradas();
+  const filtro = filtroAtivo();
   const mes = mesAtual();
   const r = resumoMes(cls, mes);
   const n = state.nativo;
@@ -138,12 +141,13 @@ export function telaPainel(el: HTMLElement) {
 
   el.innerHTML = `
   <section class="fita">
-    ${navMes(mes)}
+    ${navMes(mes, botaoFiltro())}
+    ${linhaFiltro()}
     <p class="frase">${frase}</p>
     ${total ? `<div class="barra-dupla" role="img" aria-label="Entradas ${brl(r.entradas)}, saídas ${brl(r.saidas)}">${r.entradas ? `<i class="e" style="width:${pe.toFixed(1)}%"></i>` : ''}${r.saidas ? `<i class="s" style="width:${(100 - pe).toFixed(1)}%"></i>` : ''}</div>` : ''}
     <div class="fita-valores">
-      <div><span><i class="ponto e"></i>Entradas</span><b>${brl(r.entradas)}</b></div>
-      <div><span><i class="ponto s"></i>Saídas</span><b>${brl(r.saidas)}</b></div>
+      <button type="button" data-ir="movimentos/entrada"><span><i class="ponto e"></i>Entradas</span><b>${brl(r.entradas)}</b></button>
+      <button type="button" data-ir="movimentos/saida"><span><i class="ponto s"></i>Saídas</span><b>${brl(r.saidas)}</b></button>
     </div>
     ${fora.length ? `<button type="button" class="nota-fora" data-ir="fora/${mes}">Fora da conta, por ser dinheiro seu mudando de lugar: ${fora.join(', ')}. <u>Ver quais</u></button>` : ''}
   </section>
@@ -213,7 +217,7 @@ export function telaPainel(el: HTMLElement) {
 
   <section class="panel">
     <div class="row between"><h2>Contas</h2><button type="button" class="btn small" data-ir="conferencia">Conferir com extrato</button></div>
-    <div class="folha"><div class="list">${d.contas.filter(c => c.ativa).map(c => {
+    <div class="folha"><div class="list">${d.contas.filter(c => c.ativa && (!filtro.contas.length || filtro.contas.includes(c.id))).map(c => {
       const s = saldoEstimado(d.txs, c);
       const rc = resumoMes(cls, mes, c.id);
       const gc = gastoConta.get(c.id) || 0;
@@ -231,6 +235,7 @@ export function telaPainel(el: HTMLElement) {
     <div class="row between"><h2>Últimas do mês</h2><button type="button" class="btn small" data-aba="transacoes">Ver todas</button></div>
     <div class="folha"><div class="list">${listaPorDia(cls.filter(x => x.data.slice(0, 7) === mes).sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm)).slice(0, 8)) || '<div class="empty">Nada neste mês ainda. As transações aparecem aqui assim que chegar uma notificação, você lançar à mão ou importar um extrato.</div>'}</div></div>
   </section>`;
+  ligarFiltro(el);
   graficoMeses(el.querySelector('#chMeses')!, serieMeses(cls, mes, 12), mes);
   const chR = el.querySelector<HTMLElement>('#chRitmo');
   if (chR) graficoRitmo(chR, acumulado(cls, mes), rt.dias, acumulado(cls, somaMes(mes, -1)), rt.projecao, [nomeMes(mes), ant]);
@@ -276,9 +281,33 @@ function blocoFaturas(cls: Classificada[], mes: string) {
     <p class="note">Cada fatura aparece no mês dos gastos dela, mesmo paga no começo do mês seguinte. O dinheiro que você manda para pagar e o pagamento no cartão são a mesma coisa: ficam fora de entradas e gastos, porque cada compra já contou no dia em que foi feita.</p></section>`;
 }
 
+/** Todas as entradas (ou todas as saídas) do mês, com troca de mês e o filtro do Painel. */
+export function telaMovimentos(el: HTMLElement, tipo: string) {
+  const ent = tipo === 'entrada';
+  const mes = mesAtual();
+  const xs = clsFiltradas().filter(x => x.data.slice(0, 7) === mes && x.t === (ent ? 'entrada' : 'saida'))
+    .sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm));
+  const total = xs.reduce((s, x) => s + (ent ? x.valor : -x.valor), 0);
+  const estornos = ent ? 0 : xs.filter(x => x.valor > 0).length;
+  el.innerHTML = `<section class="fita">
+    ${navMes(mes, botaoFiltro())}
+    ${linhaFiltro()}
+    <div class="seg" role="group" aria-label="Mostrar">
+      <button type="button" data-trocar="entrada" aria-pressed="${ent}">Entradas</button>
+      <button type="button" data-trocar="saida" aria-pressed="${!ent}">Saídas</button>
+    </div>
+    <p class="frase">${xs.length ? `${ent ? 'Entrou' : 'Saiu'} <b>${brl(total)}</b> em ${xs.length === 1 ? (ent ? '1 entrada' : '1 gasto') : `${xs.length} ${ent ? 'entradas' : 'gastos'}`}.` : `Nenhuma ${ent ? 'entrada' : 'saída'} neste mês.`}</p>
+    ${estornos ? `<p class="sub">Inclui ${estornos === 1 ? '1 estorno' : `${estornos} estornos`}, que descontam do total.</p>` : ''}
+  </section>
+  ${xs.length ? `<section class="panel"><div class="folha"><div class="list">${listaPorDia(xs)}</div></div>
+    <p class="note">Caixinha, transferências entre suas contas e pagamento de fatura não aparecem aqui: são dinheiro seu mudando de lugar.</p></section>` : ''}`;
+  el.querySelectorAll<HTMLButtonElement>('[data-trocar]').forEach(b => (b.onclick = () => trocar(`movimentos/${b.dataset.trocar}`)));
+  ligarFiltro(el);
+}
+
 export function telaCategoria(el: HTMLElement, cat: string) {
   const mes = mesAtual();
-  const cls = classificadas().filter(x => (x.c || SEM_CATEGORIA) === cat && contaNoTotal(x.t));
+  const cls = clsFiltradas().filter(x => (x.c || SEM_CATEGORIA) === cat && contaNoTotal(x.t));
   const doMes = cls.filter(x => x.data.slice(0, 7) === mes).sort((a, b) => b.data.localeCompare(a.data));
   const receita = state.dados.categorias.find(c => c.nome === cat)?.receita ?? false;
   const total = doMes.reduce((s, x) => s + (receita ? x.valor : -x.valor), 0);

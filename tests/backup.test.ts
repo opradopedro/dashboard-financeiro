@@ -8,6 +8,7 @@ describe('backup', () => {
     const d = receber(dadosIniciais(), [{ chave: 'k', pacote: 'com.nu.production', titulo: 'Compra', texto: 'Compra de R$ 1,00 APROVADA em X.', quando: Date.now() }]).dados;
     d.config.boasVindasVista = true;
     d.contas[0].saldoRef = { valor: 10, data: '2026-10-01' };
+    d.filtros = [{ id: 'f1', nome: 'Cartões no Pix', contas: ['nubank-cartao'], formas: ['pix'], cats: ['Mercado'] }];
     const volta = lerBackup(JSON.stringify(montarBackup(d)));
     expect(volta).toEqual(d);
   });
