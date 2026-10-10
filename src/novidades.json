@@ -1,13 +1,18 @@
 {
-  "proxima": [
-    "O app aprende com você: a categoria que você dá a uma pessoa ou loja vale para as próximas dela (ex.: estacionamento), e descrições parecidas seguem as que você já categorizou. A tela da transação diz de onde veio a categoria.",
-    "Pix no seu nome: o que chega conta como Salário; o que você manda para você mesmo não conta como gasto (ou é o pagamento de uma fatura, quando bate o valor). O Painel sugere o seu nome com um toque.",
-    "Reembolsos: marque uma entrada como reembolso de um gasto (ou sem ligar a um gasto): ela sai das entradas e desconta do gasto. O app sugere o gasto de mesmo valor e o Painel avisa quando acha um possível reembolso.",
-    "“Pagamento Cartão de crédito” na conta sem a fatura do cartão no app conta como gasto (ex.: parcelas pagas pelo cartão do banco).",
-    "Pix para a Nomad (e Wise, Remessa Online) cai em Viagem.",
-    "Nova categoria de entrada Voucher: todo dinheiro que entra na Flash (ou outra conta de vale) cai nela sozinho, inclusive o que já estava no app."
-  ],
+  "proxima": [],
   "versoes": [
+    {
+      "versao": "1.9",
+      "data": "2026-10-10",
+      "itens": [
+        "O app aprende com você: a categoria que você dá a uma pessoa ou loja vale para as próximas dela (ex.: estacionamento), e descrições parecidas seguem as que você já categorizou. A tela da transação diz de onde veio a categoria.",
+        "Pix no seu nome: o que chega conta como Salário; o que você manda para você mesmo não conta como gasto (ou é o pagamento de uma fatura, quando bate o valor). O Painel sugere o seu nome com um toque.",
+        "Reembolsos: marque uma entrada como reembolso de um gasto (ou sem ligar a um gasto): ela sai das entradas e desconta do gasto. O app sugere o gasto de mesmo valor e o Painel avisa quando acha um possível reembolso.",
+        "“Pagamento Cartão de crédito” na conta sem a fatura do cartão no app conta como gasto (ex.: parcelas pagas pelo cartão do banco).",
+        "Pix para a Nomad (e Wise, Remessa Online) cai em Viagem.",
+        "Nova categoria de entrada Voucher: todo dinheiro que entra na Flash (ou outra conta de vale) cai nela sozinho, inclusive o que já estava no app."
+      ]
+    },
     {
       "versao": "1.8",
       "data": "2026-10-10",
