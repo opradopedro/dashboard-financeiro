@@ -7,6 +7,7 @@ import { $, esc, fmtD, fmtQuando, opcoes, sinal, toast } from './fmt';
 import { campoCategoria, confirmar, ligarCampoCategoria, valorCampo } from './escolher';
 import { transacaoIgual } from '../core/duplicadas';
 import { itemTx, listaPorDia, mesAtual, navMes, sobra } from './painel';
+import { blocoReembolso, explicarCategoria, ligarReembolso } from './reembolsos';
 import type { Rota } from './nav';
 import { trocar, voltar } from './nav';
 
@@ -77,6 +78,7 @@ export function telaTx(el: HTMLElement, id: string) {
       <div class="field"><label for="tSentido">Dinheiro</label><select id="tSentido">${opcoes([{ v: 'sai', t: 'Saiu (gasto/compra)' }, { v: 'entra', t: 'Entrou (ou estorno)' }], x ? (x.valor > 0 ? 'entra' : 'sai') : 'sai')}</select></div>
       <div class="field"><label for="tConta">Conta</label><select id="tConta">${opcoes(d.contas.filter(c => c.ativa || c.id === base.conta).map(c => ({ v: c.id, t: c.nome })), base.conta)}</select></div>
       <div class="field"><label for="tCat">Categoria</label>${campoCategoria('tCat', cat)}</div>
+      ${x && explicarCategoria(x) ? `<p class="note full">${esc(explicarCategoria(x))}</p>` : ''}
       <div class="field full"><label for="tNota">Observação</label><input id="tNota" value="${esc(base.nota || '')}"></div>
       ${x ? `<label class="check full"><input type="checkbox" id="tParecidas"> Aplicar este tipo e esta categoria a todas que contêm o trecho abaixo, inclusive as próximas</label>
       <div class="field full"><label for="tTermo">Trecho da descrição</label><input id="tTermo" value="${esc(termo)}" autocapitalize="off" spellcheck="false">
@@ -87,6 +89,7 @@ export function telaTx(el: HTMLElement, id: string) {
     </form>
     <p class="note">Caixinha, transferência interna e pagamento de fatura não contam nas entradas e saídas. Estorno no cartão: tipo Saída com dinheiro Entrou (desconta do gasto).</p>
   </section>
+  ${x ? blocoReembolso(x) : ''}
   ${x ? blocoPar(x) : ''}
   ${x ? `<section class="panel"><h2>De onde veio</h2><div class="folha"><div class="list">${x.origens.map(o => `<div class="item">
       <div class="name">${ORIGENS[o.tipo]}</div><div class="val">${sinal(o.valor)}</div>
@@ -94,6 +97,7 @@ export function telaTx(el: HTMLElement, id: string) {
       <div class="meta r">${o.tipo === 'notificacao' ? `<button type="button" class="btn small" data-ir="notif/${encodeURIComponent(o.ref)}">Ver notificação</button>` : o.em ? fmtQuando(Date.parse(o.em)) : ''}</div></div>`).join('') || '<div class="empty">Lançada à mão.</div>'}</div></div>
     ${x.origens.some(o => o.tipo === 'extrato') ? '<p class="note">Quando há extrato, os dados dele prevalecem; as outras origens ficam guardadas como chegaram.</p>' : ''}</section>` : ''}`;
 
+  if (x) ligarReembolso(el, x);
   ligarCampoCategoria('tCat', { receita: () => ($('#tSentido') as HTMLSelectElement).value === 'entra' });
   $('#tTipo').onchange = () => { ($('#tSentido') as HTMLSelectElement).value = sentidoDe(($('#tTipo') as HTMLSelectElement).value as TipoTx); };
   $('#fTx').onsubmit = async e => {

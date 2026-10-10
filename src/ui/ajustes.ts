@@ -3,6 +3,7 @@
 import { atualizarEstado, enviarPacotes, mudar, state } from '../app';
 import { lerBackup, montarBackup } from '../core/backup';
 import { exportarFinai } from '../core/finai';
+import { sugerirTitular } from '../core/sugestoes';
 import { dadosIniciais } from '../core/padroes';
 import { MODOS_AVISOS, type Conta, type ModoAvisos, type TipoConta } from '../core/tipos';
 import { arred, hoje, norm, parseValor, slug } from '../core/util';
@@ -36,6 +37,7 @@ function painelServico(n: EstadoNativo | null) {
 
 function painelAvisos() {
   const c = state.dados.config;
+  const sugestao = c.titular ? null : sugerirTitular(state.dados.txs);
   return `<section class="caixa">
     <h2>Avisos</h2>
     <p class="sub">Quando chega uma notificação de app monitorado, o app pode avisar com os botões Ignorar e Adicionar, sem precisar abri-lo. Adicionar cria a regra e a transação; Ignorar silencia as próximas com o mesmo título.</p>
@@ -43,7 +45,8 @@ function painelAvisos() {
   </section>
   <section class="caixa">
     <h2>Seu nome</h2>
-    <p class="sub">Como aparece nos bancos. Pix de você para você mesmo (de outra conta sua) passa a contar como transferência interna, não como entrada.</p>
+    <p class="sub">Como aparece nos bancos. Pix no seu nome que chega conta como salário; o que você manda para você mesmo não conta como gasto (ou é o pagamento de uma fatura, quando bate o valor).</p>
+    ${!c.titular && sugestao ? `<div class="row"><span class="sub">Parece ser: <b>${esc(sugestao)}</b></span><button type="button" class="btn small" id="usarNome">Usar este nome</button></div>` : ''}
     <form id="fTitular" class="form" autocomplete="off"><div class="field full"><label for="titular">Nome completo</label><input id="titular" value="${esc(c.titular)}" autocapitalize="words"></div>
       <div class="row full"><button class="btn small" type="submit">Salvar nome</button></div></form>
   </section>`;
@@ -69,11 +72,14 @@ export function telaAjustes(el: HTMLElement) {
     await mudar(dd => ({ ...dd, config: { ...dd.config, avisos } }));
     toast('Avisos: ' + MODOS_AVISOS[avisos].toLowerCase() + '.');
   };
-  $('#fTitular').onsubmit = async e => {
-    e.preventDefault();
-    const titular = ($('#titular') as HTMLInputElement).value.trim();
+  const salvarNome = async (titular: string) => {
     await mudar(dd => ({ ...dd, config: { ...dd.config, titular } }));
     toast(titular ? 'Nome salvo.' : 'Nome apagado.');
+  };
+  $('#usarNome')?.addEventListener('click', () => void salvarNome(sugerirTitular(state.dados.txs) || ''));
+  $('#fTitular').onsubmit = async e => {
+    e.preventDefault();
+    await salvarNome(($('#titular') as HTMLInputElement).value.trim());
   };
 }
 

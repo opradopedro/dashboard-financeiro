@@ -56,6 +56,10 @@ export interface Transacao {
   tipoUsuario?: TipoTx; // escolhido por você (não muda sozinho)
   cat?: string;        // categoria escolhida por você (não muda sozinha)
   nota?: string;
+  /** Entrada que é reembolso de um gasto: id do gasto ('' = reembolso sem gasto ligado). */
+  reembolsa?: string;
+  /** Você disse que esta entrada não é reembolso (o app para de sugerir). */
+  semReembolso?: boolean;
   origens: Origem[];
   criadoEm: string;
 }

@@ -6,7 +6,7 @@ import type { TipoTx } from '../src/core/tipos';
 
 let seq = 0;
 const tx = (conta: string, data: string, valor: number, desc: string, t: TipoTx = valor < 0 ? 'saida' : 'entrada'): Classificada =>
-  ({ id: `t${++seq}`, conta, data, desc, valor, origens: [], criadoEm: '', t, c: '', auto: true });
+  ({ id: `t${++seq}`, conta, data, desc, valor, origens: [], criadoEm: '', t, c: '', auto: true, fc: '' });
 const contas = CONTAS_INICIAIS;
 const c = (id: string) => contas.find(x => x.id === id);
 

@@ -43,7 +43,16 @@ function v3(d: Dados): Dados {
   return { ...d, categorias };
 }
 
-const PASSOS: [number, (d: Dados) => Dados][] = [[2, v2], [3, v3]];
+/** v3 → v4: palavras novas das categorias que vieram com o app (ex.: Nomad em Viagem). */
+function v4(d: Dados): Dados {
+  const categorias = d.categorias.map(c => {
+    const ini = CATEGORIAS_INICIAIS.find(x => x.nome === c.nome);
+    return ini ? { ...c, palavras: [...c.palavras, ...ini.palavras.filter(p => !c.palavras.includes(p))] } : c;
+  });
+  return { ...d, categorias };
+}
+
+const PASSOS: [number, (d: Dados) => Dados][] = [[2, v2], [3, v3], [4, v4]];
 
 /** Leva os dados até a versão atual. Depois de migrar, as notificações sem regra são reprocessadas. */
 export function migrar(d: Dados): { dados: Dados; migrou: boolean } {

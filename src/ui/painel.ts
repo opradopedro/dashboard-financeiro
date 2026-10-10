@@ -1,11 +1,13 @@
 // Painel (adaptado do carteira, src/ui/banco.ts): entradas e saídas reais do mês, gastos por
 // categoria, gráfico de 12 meses e o que precisa de atenção.
-import { classificadas, nomeConta, state } from '../app';
+import { classificadas, mudar, nomeConta, state } from '../app';
+import { sugerirTitular } from '../core/sugestoes';
+import { nReembolsosPendentes } from './reembolsos';
 import { mesDaFatura, resumoMes, saldoEstimado, serieMeses, SEM_CATEGORIA, type Classificada } from '../core/classificar';
 import { FORMAS, lugares, maioresGastos, porConta, porDiaSemana, porForma, ritmo, acumulado } from '../core/indicadores';
 import { TIPOS, contaNoTotal } from '../core/tipos';
 import { hoje, somaDias, somaMes } from '../core/util';
-import { brl, compact, esc, fmtD, fmtNum, fmtYm, MES, mesLongo, sinal } from './fmt';
+import { brl, compact, esc, fmtD, fmtNum, fmtYm, MES, mesLongo, sinal, toast } from './fmt';
 import { COR_OUTRAS, CORES_CAT, fitaEmpilhada, graficoRitmo, graficoSemana } from './graficos';
 import { trocar } from './nav';
 import { botaoFiltro, clsFiltradas, filtroAtivo, ligarFiltro, linhaFiltro } from './filtro';
@@ -113,6 +115,11 @@ export function telaPainel(el: HTMLElement) {
   const avisos: string[] = [];
   if (n && !n.web && !n.acessoPermitido) avisos.push(`<button type="button" class="aviso" data-ir="boasvindas">A captura de notificações está desligada. Toque para liberar.</button>`);
   if (d.revisoes.length) avisos.push(`<button type="button" class="aviso" data-ir="revisao">${d.revisoes.length === 1 ? '1 linha de extrato espera' : `${d.revisoes.length} linhas de extrato esperam`} sua revisão</button>`);
+  const nReemb = nReembolsosPendentes();
+  if (nReemb) avisos.push(`<button type="button" class="aviso leve" data-ir="reembolsos">${nReemb === 1 ? '1 entrada pode ser' : `${nReemb} entradas podem ser`} reembolso de um gasto</button>`);
+  const nomeSug = d.config.titular ? null : sugerirTitular(d.txs);
+  if (nomeSug) avisos.push(`<div class="aviso aviso-acao"><span>Seu nome nos bancos é <b>${esc(nomeSug)}</b>? Com ele, o Pix que chega no seu nome conta como salário e o que você manda para você mesmo não conta como gasto.</span>
+    <div class="row"><button type="button" class="btn small primary" data-titular="${esc(nomeSug)}">Sim, sou eu</button><button type="button" class="btn small" data-ir="ajustes">Outro nome</button></div></div>`);
   if (semRegra) avisos.push(`<button type="button" class="aviso leve" data-aba="notificacoes?status=sem-regra">${semRegra === 1 ? '1 notificação está' : `${semRegra} notificações estão`} sem regra</button>`);
   const total = r.entradas + r.saidas;
   const pe = total > 0 ? (r.entradas / total) * 100 : 50;
@@ -236,6 +243,11 @@ export function telaPainel(el: HTMLElement) {
     <div class="folha"><div class="list">${listaPorDia(cls.filter(x => x.data.slice(0, 7) === mes).sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm)).slice(0, 8)) || '<div class="empty">Nada neste mês ainda. As transações aparecem aqui assim que chegar uma notificação, você lançar à mão ou importar um extrato.</div>'}</div></div>
   </section>`;
   ligarFiltro(el);
+  el.querySelector<HTMLButtonElement>('[data-titular]')?.addEventListener('click', async e => {
+    const titular = (e.currentTarget as HTMLButtonElement).dataset.titular!;
+    await mudar(dd => ({ ...dd, config: { ...dd.config, titular } }));
+    toast('Nome salvo.');
+  });
   graficoMeses(el.querySelector('#chMeses')!, serieMeses(cls, mes, 12), mes);
   const chR = el.querySelector<HTMLElement>('#chRitmo');
   if (chR) graficoRitmo(chR, acumulado(cls, mes), rt.dias, acumulado(cls, somaMes(mes, -1)), rt.projecao, [nomeMes(mes), ant]);

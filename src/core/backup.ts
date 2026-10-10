@@ -35,6 +35,8 @@ export function sanear(x: unknown): Dados {
         ...(tipoOk(t.tipoUsuario) ? { tipoUsuario: t.tipoUsuario as Dados['txs'][0]['tipo'] } : {}),
         ...(typeof t.cat === 'string' ? { cat: t.cat } : {}),
         ...(typeof t.nota === 'string' && t.nota ? { nota: t.nota } : {}),
+        ...(typeof t.reembolsa === 'string' ? { reembolsa: t.reembolsa } : {}),
+        ...(t.semReembolso === true ? { semReembolso: true } : {}),
         origens: arr(t.origens).filter(g => g.tipo === 'notificacao' || g.tipo === 'manual' || g.tipo === 'extrato')
           .map(g => ({ tipo: g.tipo as 'manual', ref: str(g.ref), em: str(g.em), data: str(g.data), desc: str(g.desc), valor: Number(g.valor) || 0, ...(typeof g.arquivo === 'string' ? { arquivo: g.arquivo } : {}) })),
         criadoEm: str(t.criadoEm, new Date().toISOString()),

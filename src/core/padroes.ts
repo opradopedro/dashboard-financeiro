@@ -36,7 +36,7 @@ export const CATEGORIAS_INICIAIS: Categoria[] = [
   g('Lazer', 'cinema, cinemark, ingresso*, sympla, eventim, teatro, steam, playstation, xbox, nintendo'),
   g('Compras', 'mercado livre, mercadolivre, meli, shopee, amazon, aliexpress, magalu, magazine luiza, americanas, shein, renner, riachuelo, c&a, zara, centauro, netshoes, kabum, casas bahia, ponto frio, leroy, tok stok, decathlon, papelaria, kalunga, petz, cobasi, pet shop'),
   g('Assinaturas', 'netflix, spotify, disney, prime video, amazon prime, youtube, google one, icloud, apple com, hbo, max com, deezer, globoplay, paramount, crunchyroll, chatgpt, openai, claude, anthropic, microsoft, adobe, canva'),
-  g('Viagem', 'airbnb, booking, hotel, pousada, latam, gol linhas, azul linhas, decolar, 123milhas, smiles, rodoviaria, buser'),
+  g('Viagem', 'airbnb, booking, hotel, pousada, latam, gol linhas, azul linhas, decolar, 123milhas, smiles, rodoviaria, buser, nomad, nomad fintech, wise, remessa online'),
   g('Serviços', 'barbearia, salao, lavanderia, manutencao, conserto'),
   g('Taxas e juros', 'iof, tarifa, anuidade, juros, multa, encargo, encargos'),
   g('Impostos', 'darf, ipva, imposto, receita federal, detran, licenciamento'),
@@ -123,7 +123,7 @@ export const REGRAS_INICIAIS: RegraNotif[] = ([
 ] as Base[]).map(regra);
 
 /** Versão atual dos dados (ver migracoes.ts). */
-export const VERSAO_DADOS = 3;
+export const VERSAO_DADOS = 4;
 
 export function dadosIniciais(): Dados {
   return {

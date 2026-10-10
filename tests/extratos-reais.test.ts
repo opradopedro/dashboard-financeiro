@@ -96,9 +96,12 @@ describe('Pix para você mesmo (nome do titular)', () => {
     ['Pix recebido FULANO DE TAL SILVA', '', false],
     ['Compra FULANO DE TAL SILVA', 'Fulano de Tal Silva', false],
   ])('%s / %s → %s', (d, t, r) => expect(ehTitular(d, t)).toBe(r));
-  it('vira transferência interna na classificação', () => {
-    const cls = classificar([{ id: 'a', conta: 'mercadopago-conta', data: '2026-09-25', desc: 'Pix recebido FULANO DE TAL SILVA', valor: 620, origens: [], criadoEm: '' }],
+  it('o que chega no seu nome é salário; o que sai para você mesmo não conta', () => {
+    const cls = classificar([
+      { id: 'a', conta: 'mercadopago-conta', data: '2026-09-25', desc: 'Pix recebido FULANO DE TAL SILVA', valor: 620, origens: [], criadoEm: '' },
+      { id: 'b', conta: 'mercadopago-conta', data: '2026-09-26', desc: 'Pix enviado Fulano de Tal Silva', valor: -300, origens: [], criadoEm: '' }],
       { contas: CONTAS_INICIAIS, categorias: CATEGORIAS_INICIAIS, regrasCat: [], titular: 'Fulano de Tal Silva' });
-    expect(cls[0].t).toBe('interna');
+    expect(cls.map(x => x.t)).toEqual(['entrada', 'interna']);
+    expect(cls[0].c).toBe('Salário');
   });
 });

@@ -4,7 +4,7 @@ import { ehVazio, filtrar, filtroVazio, juntarFiltros } from '../src/core/filtro
 import { CONTAS_INICIAIS } from '../src/core/padroes';
 
 const tx = (id: string, conta: string, desc: string, valor: number, c = '', t: Classificada['t'] = valor < 0 ? 'saida' : 'entrada'): Classificada =>
-  ({ id, conta, data: '2026-09-01', desc, valor, origens: [], criadoEm: '', t, c, auto: true });
+  ({ id, conta, data: '2026-09-01', desc, valor, origens: [], criadoEm: '', t, c, auto: true, fc: '' });
 const cls = [
   tx('a', 'nubank-cartao', 'Loja', -10, 'Compras'),
   tx('b', 'mercadopago-conta', 'Pix enviado Fulano', -20, 'Transferências'),

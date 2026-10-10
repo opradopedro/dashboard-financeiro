@@ -218,6 +218,7 @@ describe('Voucher', () => {
     const cs: Conta[] = [...contas, { id: 'flash', nome: 'Flash alimentação', banco: 'Flash', tipo: 'corrente', ativa: true }];
     const cls = classificar([tx('flash', '2026-08-28', 'Depósito transferido', 887), tx('flash', '2026-08-28', 'Depósito transferido', 670, { cat: 'Outras receitas' }),
       tx('mp', '2026-08-28', 'Depósito transferido', 100), tx('flash', '2026-08-29', 'Padaria', -10)], { ...ctx, contas: cs });
-    expect(cls.map(x => x.c)).toEqual(['Voucher', 'Outras receitas', '', 'Alimentação']);
+    // A 3ª aprende com a 2ª (mesma descrição, categoria escolhida por você).
+    expect(cls.map(x => x.c)).toEqual(['Voucher', 'Outras receitas', 'Outras receitas', 'Alimentação']);
   });
 });

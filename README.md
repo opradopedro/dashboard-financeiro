@@ -175,6 +175,22 @@ Na lista de arquivos, o aviso já aparece em cada arquivo repetido. Quando há a
 importadas), a lista mostra **Importar novos** (em destaque, deixa os repetidos de fora) e
 **Importar todos** (inclui os repetidos; as linhas repetidas são puladas).
 
+### Aprendizado, salário e reembolsos
+- **O app aprende com você.** A categoria que você dá a uma pessoa ou loja vale para as próximas
+  transações dela (ex.: o mesmo estacionamento), mesmo com descrições como "Pix enviado" que
+  cairiam em Transferências. Descrições parecidas com as que você já categorizou (pelo menos 2)
+  também seguem. O tipo (ex.: transferência interna) é aprendido depois de 2 escolhas iguais. Na
+  tela da transação aparece de onde veio a categoria. Só aprende com escolhas suas.
+- **Pix no seu nome** (Ajustes → Seu nome, ou o aviso do Painel que sugere o nome): o que chega
+  conta como **Salário**; o que você manda para você mesmo não conta (ou é o pagamento da fatura,
+  quando bate o valor). Se algum não for salário (ex.: rescisão), troque a categoria na transação.
+- **Reembolsos:** na tela de uma entrada, "É reembolso?" sugere gastos de valor parecido (de 60 dias
+  antes a 30 depois); marque o certo, procure outro, ou "Reembolso sem ligar" (ex.: conta dividida).
+  O reembolso sai das entradas e desconta do gasto, na categoria dele. O Painel avisa quando há
+  entradas com um gasto de mesmo valor por perto.
+- **"Pagamento Cartão de crédito" na conta** sem a fatura do cartão no app conta como gasto (ex.:
+  parcelas de uma compra pagas pelo cartão do banco).
+
 ### Voucher
 A categoria de entrada **Voucher** recebe sozinha todo dinheiro que entra numa conta de vale (Flash,
 Alelo, Sodexo…), como os depósitos do benefício. Se você escolher outra categoria numa dessas

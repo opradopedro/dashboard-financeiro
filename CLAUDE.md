@@ -56,6 +56,8 @@ src/
     migracoes.ts   versões dos dados (v2: Flash, regras reais; v3: categoria Voucher); regras-v1.json = regras padrão da v1
     ingestao.ts    fila → registro → regras → transação; reprocessar
     juntar.ts      deduplicação de extrato, revisão, conferência mensal
+    aprender.ts    aprende com escolhas suas: contraparte() + Bayes ingênuo (categoria) e tipo
+    sugestoes.ts   sugerirTitular, candidatosReembolso, possiveisReembolsos
     duplicadas.ts  avisos antes de gravar: importação repetida, linhas iguais de outro extrato, tx igual
     filtros.ts     filtro do Painel (contas, formas, categorias): juntarFiltros (união por campo), filtrar
     finai.ts       exportar/ler finai-banco/1
@@ -66,7 +68,7 @@ src/
   nativo/notificacoes.ts  ponte com o plugin Kotlin (+ imitação para navegador)
   app.ts           estado, mudar() (fila de gravações), consumirFila(), classificadas() com cache
   ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts, graficos.ts (SVG),
-                   escolher.ts (folhas: categoria com busca, opção, confirmar), datas.ts, filtro.ts (filtro em uso na memória,
+                   escolher.ts (folhas: categoria com busca, opção, confirmar), datas.ts, reembolsos.ts (bloco na transação, lista), filtro.ts (filtro em uso na memória,
                    clsFiltradas, folha, Filtros salvos), novidades.ts
   novidades.json   histórico de versões + `proxima` (pendentes); gera as notas da Release
   main.ts          tabela de telas, navegação por data-ir/data-aba, inicialização
@@ -105,20 +107,24 @@ Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INI
 - `valor`: negativo = saiu/gastou (inclusive compra no cartão); positivo = entrou/estorno.
 - `tipo` (da regra de notificação), `tipoUsuario` e `cat` (escolhas manuais) ficam na transação;
   o tipo/categoria **final** é calculado em `classificar()` (nunca gravado):
-  `tipoUsuario` > regra de categoria > `tipo` da regra de notificação > `tipoAuto()` pela descrição.
+  `tipoUsuario` > reembolso (`reembolsa`) > regra de categoria > `tipo` da regra de notificação >
+  tipo aprendido (contraparte, 2+ escolhas iguais) > `tipoAuto()` pela descrição. Pix no nome do
+  titular: chegando = entrada (Salário); saindo = interna (ou fatura, se casar).
   Depois junta pares, com `par` apontando a outra ponta: Pix entre contas suas = interna (±3 dias);
   pagamento no cartão (só tipo fatura: FATURA em qualquer sinal, regra ou escolha; crédito comum no
   cartão é estorno) + saída de conta que não é vale (`ehContaVale`) de
   mesmo valor, de 10 dias antes a 5 depois = fatura (prefere a que cita o banco do cartão); sem valor
   igual, valor sem centavos a até R$ 5 ou 1% (o dono costuma mandar a fatura arredondada em reais:
   1.118,30 → 1.118/1.119/1.120); por último, até 15% ou R$ 50 se a saída tem o nome do titular ou
-  cita o banco (`APELIDOS`). Os aproximados exigem fatura >= R$ 50 e saída com cara de pagamento
+  cita o banco (`APELIDOS`). "Pagamento de cartão" na conta sem par vira saída se o cartão do
+  mesmo banco não tem gastos nos 45 dias antes (ex.: parcelas). Os aproximados exigem fatura >= R$ 50 e saída com cara de pagamento
   (`PAGAVEL`: Pix, transferência, boleto…). A sobra fica na conta do banco. `mesDaFatura(data)` =
   mês de 15 dias antes do pagamento (pago dia 5 = fatura do mês anterior); o Painel mostra as faturas
   nesse mês.
-- Categoria: `cat` > regra de categoria > entrada em conta de vale = `CAT_VOUCHER` ("Voucher") >
+- Categoria: `cat` > reembolso ligado (categoria do gasto) > regra de categoria > entrada em conta de
+  vale = `CAT_VOUCHER` > titular chegando = Salário > aprendida pela contraparte (aprender.ts) >
   palavras-chave (trecho mais longo vence; entrada só em
-  categoria de receita) > sem categoria (`''`, exibido “Sem categoria”).
+  categoria de receita) > aprendida por palavras (Bayes) > sem categoria (`''`, exibido “Sem categoria”).
 - Painel conta só `entrada` e `saida`. Estorno no cartão = `saida` com valor positivo.
 
 ### Extratos e deduplicação (`juntar.ts`)

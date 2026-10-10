@@ -4,6 +4,7 @@
 import type { Categoria, Conta, RegraCat, TipoTx, Transacao } from './tipos';
 import { diasEntre, norm, somaDias } from './util';
 import { CAT_VOUCHER } from './padroes';
+import { porContraparte, porPalavras, tipoAprendido, treinar } from './aprender';
 
 const CAIXINHA = / (caixinhas?|cofrinhos?|cofre|dinheiro reservado|dinheiro retirado|reservado|reserva por|retirada da reserva|guardado|porquinho|aplicacao|aplic|resgate|cdb|lci|lca|tesouro direto|investimento|fundo de investimento|previdencia) /;
 const FATURA = / (pagamento (da |de )?fatura|pagto fatura|pgto fatura|pagamento cartao|pagamento de cartao|fatura cartao|pagamento recebido|pagamento efetuado|credit card payment) /;
@@ -37,7 +38,9 @@ export function ehTitular(desc: string, titular: string): boolean {
 /** Tipo automático de uma transação, olhando só para ela (sem regra nem escolha sua). */
 export function tipoAuto(desc: string, valor: number, cartao: boolean, titular = ''): TipoTx {
   const t = norm(desc);
-  if (!cartao && titular && ehTitular(desc, titular)) return 'interna';
+  // Pix no seu nome: o que chega é salário (vem da conta onde ele cai); o que sai é dinheiro seu indo
+  // para outra conta sua (ou o pagamento de uma fatura, se casar com uma: ver classificar).
+  if (!cartao && titular && ehTitular(desc, titular)) return valor > 0 ? 'entrada' : 'interna';
   if (cartao) {
     // No cartão: pagamento da fatura (qualquer sinal: há faturas que trazem as compras positivas)
     // ou estorno (estorno desconta do gasto, por isso "saída" positiva).
@@ -70,11 +73,17 @@ export function indicePalavras(cats: Categoria[]) {
   };
 }
 
+/** De onde veio a categoria (para explicar na tela). */
+export type FonteCat = 'sua' | 'reembolso' | 'regra' | 'voucher' | 'salario' | 'contraparte' | 'palavra' | 'palavras' | '';
+
 export interface Classificada extends Transacao {
   t: TipoTx;          // tipo final
   c: string;          // categoria final ('' = sem categoria)
   auto: boolean;      // tipo decidido pelo app (sem escolha sua nem regra de categoria)
   par?: string;       // a outra ponta: transferência entre contas suas, ou Pix/débito que pagou a fatura
+  fc: FonteCat;       // de onde veio a categoria
+  aprendida?: number; // categoria aprendida: com quantas escolhas suas
+  reembolsos?: string[]; // gasto: ids das entradas marcadas como reembolso dele
 }
 
 export interface Contexto { contas: Conta[]; categorias: Categoria[]; regrasCat: RegraCat[]; titular?: string }
@@ -92,23 +101,49 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
   const vale = new Set(ctx.contas.filter(c => ehContaVale(c)).map(c => c.id));
   const temVoucher = ctx.categorias.some(c => c.nome === CAT_VOUCHER && c.receita);
 
+  const modelo = treinar(txs);
+  const receita = new Map(ctx.categorias.map(c => [c.nome, c.receita]));
+  const temSalario = receita.get('Salário') === true;
+
   const out: Classificada[] = txs.map(tx => {
     const cartao = tipoConta.get(tx.conta) === 'cartao';
-    let t: TipoTx = tx.tipo ?? tipoAuto(tx.desc, tx.valor, cartao, ctx.titular);
+    const reembolso = tx.reembolsa !== undefined;
+    let t: TipoTx = tx.tipo ?? tipoAprendido(modelo, tx.desc) ?? tipoAuto(tx.desc, tx.valor, cartao, ctx.titular);
     let c: string | null = null;
+    let fc: FonteCat = '';
     let auto = true;
+    let aprendida: number | undefined;
     const d = norm(tx.desc);
-    for (const r of regras) if (d.includes(r.t)) { if (r.tipo) { t = r.tipo; auto = false; } if (r.cat) c = r.cat; }
+    for (const r of regras) if (d.includes(r.t)) { if (r.tipo) { t = r.tipo; auto = false; } if (r.cat) { c = r.cat; fc = 'regra'; } }
+    // Reembolso: desconta do gasto (como um estorno), na categoria do gasto que ele paga.
+    if (reembolso) { t = 'saida'; auto = false; }
     if (tx.tipoUsuario) { t = tx.tipoUsuario; auto = false; }
-    if (tx.cat) c = tx.cat;
+    if (tx.cat) { c = tx.cat; fc = 'sua'; }
+    const entrada = t === 'entrada';
+    const pode = (cat: string) => receita.get(cat) === entrada;
     // Dinheiro que entra numa conta de vale é o crédito do benefício: categoria Voucher.
-    if (c == null && t === 'entrada' && vale.has(tx.conta) && temVoucher) c = CAT_VOUCHER;
-    if (c == null) c = catPorPalavra(tx.desc, t === 'entrada') ?? '';
-    return { ...tx, t, c, auto };
+    if (c == null && entrada && vale.has(tx.conta) && temVoucher) { c = CAT_VOUCHER; fc = 'voucher'; }
+    // Pix no seu nome que chega: salário.
+    if (c == null && entrada && temSalario && ctx.titular && ehTitular(tx.desc, ctx.titular)) { c = 'Salário'; fc = 'salario'; }
+    if (c == null) { const p = porContraparte(modelo, tx.desc, pode); if (p) { c = p.cat; fc = 'contraparte'; aprendida = p.exemplos; } }
+    if (c == null) { const k = catPorPalavra(tx.desc, entrada); if (k) { c = k; fc = 'palavra'; } }
+    if (c == null) { const p = porPalavras(modelo, tx.desc, pode); if (p) { c = p.cat; fc = 'palavras'; aprendida = p.exemplos; } }
+    return { ...tx, t, c: c ?? '', fc, auto, ...(aprendida ? { aprendida } : {}) };
   });
 
+  // Reembolso ligado a um gasto: fica com a categoria do gasto, e o gasto sabe quem o reembolsou.
+  const porId = new Map(out.map(x => [x.id, x]));
+  for (const x of out) {
+    if (!x.reembolsa) continue;
+    const g = porId.get(x.reembolsa);
+    if (!g) continue;
+    if (!x.cat) { x.c = g.c; x.fc = 'reembolso'; }
+    x.par = g.id;
+    (g.reembolsos ||= []).push(x.id);
+  }
+
   // Pares entre contas diferentes (ex.: Pix da sua conta do banco A para a do banco B).
-  const livres = out.filter(x => x.auto && (x.t === 'entrada' || x.t === 'saida') && tipoConta.get(x.conta) !== 'cartao');
+  const livres = out.filter(x => x.auto && !x.reembolsa && (x.t === 'entrada' || x.t === 'saida' || x.t === 'interna') && tipoConta.get(x.conta) !== 'cartao');
   const usados = new Set<Classificada>();
   for (const e of livres) {
     if (e.valor <= 0 || usados.has(e)) continue;
@@ -161,6 +196,19 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
   const pagavel = (x: Classificada) => PAGAVEL.test(norm(x.desc)) || x.t === 'fatura';
   aproximar((_, x, v) => v >= 50 && pagavel(x) && semCentavos(x) && Math.abs(-x.valor - v) <= Math.max(5, v * 0.01));
   aproximar((cc, x, v) => v >= 50 && proprio(cc, x) && Math.abs(-x.valor - v) <= Math.max(50, v * 0.15));
+
+  // "Pagamento de cartão" na conta que não casou com nenhum pagamento no cartão: só é pagamento de
+  // fatura se as compras desse cartão estão no app (cartão do mesmo banco com gastos nos 45 dias
+  // antes). Senão, é o único registro do gasto (ex.: parcelas pagas pelo cartão de crédito do banco)
+  // e conta como saída. Escolha sua ou regra de categoria não mudam.
+  const bancoConta = new Map(ctx.contas.map(c => [c.id, norm(c.banco).trim()]));
+  const cartoesDoBanco = (b: string) => new Set(ctx.contas.filter(c => c.tipo === 'cartao' && norm(c.banco).trim() === b).map(c => c.id));
+  for (const x of out) {
+    if (x.t !== 'fatura' || ehCartao(x) || x.par || !x.auto) continue;
+    const cards = cartoesDoBanco(bancoConta.get(x.conta) || '');
+    const comprou = out.some(y => cards.has(y.conta) && y.t === 'saida' && y.valor < 0 && diasEntre(y.data, x.data) <= 45 && y.data <= x.data);
+    if (!comprou) { x.t = 'saida'; if (!x.c) { const k = catPorPalavra(x.desc, false); if (k) { x.c = k; x.fc = 'palavra'; } } }
+  }
   return out;
 }
 
