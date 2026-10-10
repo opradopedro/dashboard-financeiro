@@ -5,6 +5,7 @@ import { aplicarRegra, sentidoPadrao, sugerirPadrao } from '../core/regras';
 import { ACOES, ORIGENS_REGRA, TIPOS, type AcaoRegra, type OrigemRegra, type RegraNotif, type TipoTx } from '../core/tipos';
 import { norm, uid } from '../core/util';
 import { $, esc, fmtD, opcoes, sinal, toast } from './fmt';
+import { campoCategoria, ligarCampoCategoria, valorCampo } from './escolher';
 import { trocar, voltar, type Rota } from './nav';
 
 const ORDENS: [string, string][] = [['app', 'Por app'], ['recentes', 'Mais recentes'], ['antigas', 'Mais antigas']];
@@ -27,7 +28,7 @@ export function telaRegras(el: HTMLElement, r: Rota) {
         <form id="fRegraCat" class="form" autocomplete="off">
           <div class="field full"><label for="rcTermo">A descrição contém</label><input id="rcTermo" placeholder="itau unibanco" autocapitalize="off" spellcheck="false" required></div>
           <div class="field"><label for="rcTipo">Tipo</label><select id="rcTipo"><option value="">Não mudar</option>${opcoes(Object.entries(TIPOS).map(([v, t]) => ({ v, t })))}</select></div>
-          <div class="field"><label for="rcCat">Categoria</label><select id="rcCat"><option value="">Não mudar</option>${opcoes(d.categorias.map(c => ({ v: c.nome, t: c.nome })))}</select></div>
+          <div class="field"><label for="rcCat">Categoria</label>${campoCategoria('rcCat', '', 'Não mudar')}</div>
           <div class="row full"><button class="btn primary" type="submit">Criar regra</button></div>
         </form></section>
       <div class="folha"><div class="list">${d.regrasCat.map(x => `<div class="item"><div class="name">“${esc(x.termo)}”</div>
@@ -61,11 +62,12 @@ export function telaRegras(el: HTMLElement, r: Rota) {
   <div class="seg" role="group" aria-label="Origem"><button type="button" data-q="${q({ origem: '' })}" aria-pressed="${!origem}">Todas as origens</button>${(Object.keys(ORIGENS_REGRA) as OrigemRegra[]).map(o => `<button type="button" data-q="${q({ origem: o })}" aria-pressed="${o === origem}">${ORIGENS_REGRA[o]} (${contagem(o)})</button>`).join('')}</div>`}
   ${corpo}`;
   el.querySelectorAll<HTMLButtonElement>('[data-q]').forEach(b => (b.onclick = () => trocar('regras' + b.dataset.q)));
+  ligarCampoCategoria('rcCat', { vazio: 'Não mudar', receita: () => ($('#rcTipo') as HTMLSelectElement | null)?.value === 'entrada' });
   $('#fRegraCat')?.addEventListener('submit', async e => {
     e.preventDefault();
     const termo = norm(($('#rcTermo') as HTMLInputElement).value).trim();
     const tipoSel = ($('#rcTipo') as HTMLSelectElement).value as TipoTx | '';
-    const cat = ($('#rcCat') as HTMLSelectElement).value;
+    const cat = valorCampo('rcCat');
     if (!termo || (!tipoSel && !cat)) { toast('Escreva o trecho e escolha o tipo ou a categoria.'); return; }
     await mudar(dd => ({ ...dd, regrasCat: [...dd.regrasCat.filter(x => x.termo !== termo), { id: uid('rc'), termo, ...(tipoSel ? { tipo: tipoSel } : {}), ...(cat ? { cat } : {}) }] }));
     toast(`Regra criada para “${termo}”.`);

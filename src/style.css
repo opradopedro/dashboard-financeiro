@@ -224,3 +224,28 @@ nav .num{position:absolute;top:4px;left:calc(50% + 6px);min-width:17px;height:17
 /* ---------- novidades ---------- */
 .novidades{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.55}
 .novidades li::marker{color:var(--champanhe)}
+
+/* ---------- escolha de categoria (folha que sobe de baixo) ---------- */
+.campo-sel{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:46px;padding:11px 13px;
+  background:var(--lousa-alta);border:1px solid transparent;border-radius:var(--raio-p);font-size:15px;text-align:left;color:var(--papel)}
+.campo-sel span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.campo-sel svg{flex:none;color:var(--grafite)}
+.campo-sel.vazio span{color:var(--grafite)}
+dialog.folha-sel{position:fixed;inset:auto 0 0 0;margin:0 auto;width:100%;max-width:680px;max-height:78vh;padding:0;border:0;
+  border-radius:var(--raio-g) var(--raio-g) 0 0;background:var(--lousa);color:var(--papel);display:flex;flex-direction:column;
+  padding-bottom:var(--sab);box-shadow:0 -12px 40px rgba(0,0,0,.45)}
+dialog.folha-sel:not([open]){display:none}
+dialog.folha-sel::backdrop{background:rgba(6,9,15,.62)}
+.folha-sel-cab{display:flex;gap:10px;align-items:center;padding:18px 16px 12px;border-bottom:1px solid var(--linha)}
+.folha-sel-cab input{flex:1}
+.folha-sel-lista{overflow-y:auto;padding:4px 8px 16px;overscroll-behavior:contain}
+.sel-grupo{font-size:12.5px;color:var(--grafite);font-weight:550;padding:14px 10px 4px}
+.sel-op{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:48px;padding:10px;border:0;
+  background:none;border-radius:var(--raio-p);font-size:15.5px;text-align:left}
+.sel-op:active{background:var(--lousa-alta)}
+.sel-op.atual{color:var(--champanhe);font-weight:600}
+.sel-op.sem span{color:var(--grafite)}
+.sel-op.sel-nova{color:var(--champanhe);font-weight:600;margin-top:6px;border:1px dashed var(--linha-forte)}
+.sel-nada{color:var(--grafite);font-size:14px;padding:14px 10px 4px}
+@media (prefers-reduced-motion:no-preference){dialog.folha-sel[open]{animation:sobe .2s ease-out}}
+@keyframes sobe{from{transform:translateY(24px);opacity:.4}to{transform:none;opacity:1}}

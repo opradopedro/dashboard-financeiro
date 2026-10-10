@@ -118,7 +118,8 @@ async function iniciar() {
   await iniciarDados();
   aoMudar(() => {
     const t = TELAS[rotaAtual().nome];
-    if (t?.vivo) render(false); else marcarPendencias();
+    // Com uma folha de escolha aberta, não refaz a tela (perderia o que estava sendo preenchido).
+    if (t?.vivo && !document.querySelector('dialog[open]')) render(false); else marcarPendencias();
     void sincronizarNativo().catch(console.error);
   });
   await sincronizarNativo().catch(console.error);

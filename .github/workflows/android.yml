@@ -1,6 +1,6 @@
 # Testes, typecheck, build e APK em todo push (para conferir que nada quebrou).
 # A Release (APK assinado para instalar) só sai quando é pedida:
-#   - commit com "[versao]" na mensagem (é assim que o Claude publica), ou
+#   - commit com "[versao]" na PRIMEIRA linha da mensagem (é assim que o Claude publica), ou
 #   - botão "Run workflow" (Actions → Android → Run workflow).
 # O número e a lista do que mudou vêm de src/novidades.json (a primeira de "versoes").
 # Nenhuma Release antiga é apagada.
@@ -47,7 +47,8 @@ jobs:
           CODIGO=$(( $(date -u +%s) - 1767225600 ))
           V=$(node -p "require('./src/novidades.json').versoes[0].versao")
           PUBLICAR=false
-          if [ "$EVENTO" = "workflow_dispatch" ] || printf '%s' "$MENSAGEM" | grep -qF '[versao]'; then PUBLICAR=true; fi
+          # Só a primeira linha do commit conta (o corpo pode citar a marca sem querer publicar).
+          if [ "$EVENTO" = "workflow_dispatch" ] || printf '%s\n' "$MENSAGEM" | head -n 1 | grep -qF '[versao]'; then PUBLICAR=true; fi
           if [ "$PUBLICAR" = "true" ]; then
             NOME="$V"
             # Versão já publicada (ex.: botão Run workflow sem número novo): vira $V.<execução>.

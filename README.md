@@ -171,7 +171,7 @@ faça um backup de vez em quando.
 
 O workflow `.github/workflows/android.yml` roda em **push para qualquer branch** (só confere:
 testes, typecheck e compilação, sem Release) e publica uma **versão nova** quando é pedida: commit
-com `[versao]` na mensagem ou o botão **Actions → Android → Run workflow** (escolha o branch).
+com `[versao]` no título (primeira linha) ou o botão **Actions → Android → Run workflow** (escolha o branch).
 Assim as mudanças se acumulam e vão juntas numa versão só. Ele:
 
 1. roda typecheck e testes (Vitest);

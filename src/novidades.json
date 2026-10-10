@@ -1,5 +1,6 @@
 {
   "proxima": [
+    "Escolher categoria agora abre uma lista com busca: ela filtra enquanto você digita e, se não achar, oferece “+ Adicionar categoria”.",
     "Importar vários arquivos de uma vez: o app reconhece de qual banco é cada um (Nubank, Rico, Flash, Mercado Pago e OFX de qualquer banco) e já escolhe a conta.",
     "Arquivo de banco sem conta no app (ex.: Itaú): botão para criar a conta na hora.",
     "O formato de cada arquivo importado fica salvo; da próxima vez ele é reconhecido mesmo sem ser de um banco conhecido.",

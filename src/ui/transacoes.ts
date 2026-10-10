@@ -4,6 +4,7 @@ import { SEM_CATEGORIA } from '../core/classificar';
 import { ORIGENS, TIPOS, type TipoTx, type Transacao } from '../core/tipos';
 import { arred, hoje, norm, parseValor, termoDe, uid } from '../core/util';
 import { $, esc, fmtD, fmtQuando, opcoes, sinal, toast } from './fmt';
+import { campoCategoria, ligarCampoCategoria, valorCampo } from './escolher';
 import { listaPorDia, mesAtual, navMes } from './painel';
 import type { Rota } from './nav';
 import { trocar, voltar } from './nav';
@@ -59,7 +60,6 @@ export function telaTx(el: HTMLElement, id: string) {
   const cat = x?.c || '';
   const termo = x ? termoDe(x.desc) : '';
 
-  const cats = d.categorias;
   el.innerHTML = `
   ${x ? `<section class="fita">
     <p class="label">${esc(nomeConta(x.conta))}, ${fmtD(x.data)}</p>
@@ -75,7 +75,7 @@ export function telaTx(el: HTMLElement, id: string) {
       <div class="field"><label for="tTipo">Tipo</label><select id="tTipo">${opcoes(Object.entries(TIPOS).map(([v, t]) => ({ v, t })), tipo)}</select></div>
       <div class="field"><label for="tSentido">Dinheiro</label><select id="tSentido">${opcoes([{ v: 'sai', t: 'Saiu (gasto/compra)' }, { v: 'entra', t: 'Entrou (ou estorno)' }], x ? (x.valor > 0 ? 'entra' : 'sai') : 'sai')}</select></div>
       <div class="field"><label for="tConta">Conta</label><select id="tConta">${opcoes(d.contas.filter(c => c.ativa || c.id === base.conta).map(c => ({ v: c.id, t: c.nome })), base.conta)}</select></div>
-      <div class="field"><label for="tCat">Categoria</label><select id="tCat"><option value="">${SEM_CATEGORIA}</option>${opcoes(cats.map(c => ({ v: c.nome, t: c.nome + (c.receita ? ' (entrada)' : '') })), cat)}</select></div>
+      <div class="field"><label for="tCat">Categoria</label>${campoCategoria('tCat', cat)}</div>
       <div class="field full"><label for="tNota">Observação</label><input id="tNota" value="${esc(base.nota || '')}"></div>
       ${x ? `<label class="check full"><input type="checkbox" id="tParecidas"> Aplicar este tipo e esta categoria a todas que contêm o trecho abaixo, inclusive as próximas</label>
       <div class="field full"><label for="tTermo">Trecho da descrição</label><input id="tTermo" value="${esc(termo)}" autocapitalize="off" spellcheck="false">
@@ -92,6 +92,7 @@ export function telaTx(el: HTMLElement, id: string) {
       <div class="meta r">${o.tipo === 'notificacao' ? `<button type="button" class="btn small" data-ir="notif/${encodeURIComponent(o.ref)}">Ver notificação</button>` : o.em ? fmtQuando(Date.parse(o.em)) : ''}</div></div>`).join('') || '<div class="empty">Lançada à mão.</div>'}</div></div>
     ${x.origens.some(o => o.tipo === 'extrato') ? '<p class="note">Quando há extrato, os dados dele prevalecem; as outras origens ficam guardadas como chegaram.</p>' : ''}</section>` : ''}`;
 
+  ligarCampoCategoria('tCat', { receita: () => ($('#tSentido') as HTMLSelectElement).value === 'entra' });
   $('#tTipo').onchange = () => { ($('#tSentido') as HTMLSelectElement).value = sentidoDe(($('#tTipo') as HTMLSelectElement).value as TipoTx); };
   $('#fTx').onsubmit = async e => {
     e.preventDefault();
@@ -99,7 +100,7 @@ export function telaTx(el: HTMLElement, id: string) {
     const valor = Math.abs(parseValor(v('#tValor')));
     if (!Number.isFinite(valor) || valor === 0) { toast('Valor inválido.'); return; }
     const tipoSel = v('#tTipo') as TipoTx;
-    const catSel = v('#tCat');
+    const catSel = valorCampo('tCat');
     const t: Transacao = { ...base, data: v('#tData'), desc: v('#tDesc'), conta: v('#tConta'), valor: arred(v('#tSentido') === 'sai' ? -valor : valor) };
     if (v('#tNota')) t.nota = v('#tNota'); else delete t.nota;
     // Tipo e categoria só ficam "fixos" se você mudou o que o app tinha decidido.

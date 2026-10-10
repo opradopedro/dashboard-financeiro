@@ -21,7 +21,8 @@ passo manual dele precisa ser possível pelo navegador do celular, com passo a p
   quem usa). Só quando o dono pedir "atualizar a versão do APK":
   1. mover os itens de `proxima` para uma entrada nova no topo de `versoes`
      (`versao` = anterior + 0.1, ex.: 1.7 → 1.8; `data` = hoje AAAA-MM-DD) e deixar `proxima: []`;
-  2. commit com `[versao]` na mensagem, push, acompanhar o workflow até a Release `v<versão>`;
+  2. commit com `[versao]` no **título** (primeira linha), push, acompanhar o workflow até a
+     Release `v<versão>`. Fora disso, nunca escrever essa marca no título de um commit;
   3. responder no chat com o link da Release e a lista do que mudou (os mesmos itens).
   O app mostra o histórico em Ajustes → Novidades. Não apague Releases nem tags.
 
