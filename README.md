@@ -54,7 +54,7 @@ Tudo é tocável e abre o **detalhe** daquilo: fatias das pizzas (para onde foi,
 a pizza de **como pagou** (Pix, crédito, vale…), lugares de **onde mais gastou**, barras dos
 **dias da semana**, **contas** e os meses do gráfico de 12 meses (abre o mês). O detalhe mostra o
 total do mês, a média dos 11 meses anteriores, as divisões que ainda fazem sentido (por categoria,
-como pagou, por conta, em rosca tocável), 12 meses e as transações do mês. Divisões juntam o
+como pagou, por conta, em pizza tocável), 12 meses e as transações do mês. Divisões juntam o
 recorte: no detalhe do Pix, tocar em Mercado abre “Mercado, Pix”. Na transação, a categoria e a
 conta também abrem o detalhe delas.
 
@@ -174,7 +174,7 @@ combinam (Nubank e Rico, só em Alimentação). **Ajustes → Filtros salvos** c
 filtro em uso vale até fechar o app.
 
 Tocar em **Entradas** ou **Saídas** no topo do Painel abre a lista do mês, com as setas de mês, a
-troca entre entradas e saídas e a rosca por categoria.
+troca entre entradas e saídas e a pizza por categoria.
 
 ### Avisos de repetido
 Antes de gravar, o app pergunta se você quer continuar quando:
