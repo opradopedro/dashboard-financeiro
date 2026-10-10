@@ -100,7 +100,21 @@ tipo e categoria, ou excluir. Marque *aplicar às parecidas* para o app aprender
 categoria).
 
 ### Importar extratos
-Aba **Importar**: escolha a conta e o arquivo (PDF, CSV, Excel .xlsx/.xls, OFX ou finai-banco/1 .json).
+Aba **Importar** → **Escolher arquivos** (PDF, CSV, Excel .xlsx/.xls, OFX ou finai-banco/1 .json).
+Dá para escolher **vários arquivos de uma vez** (no seletor do Android, toque e segure no primeiro
+e marque os outros). O app reconhece o banco de cada um e já escolhe a conta:
+
+1. **formato já importado antes** (modelo salvo de uma conta com o mesmo cabeçalho);
+2. **formato conhecido**: cabeçalho do CSV (tabela abaixo, mais o extrato da conta Nubank e o
+   relatório do Mercado Pago), texto do PDF do Mercado Pago, código do banco no OFX (Nubank 260,
+   Mercado Pago 323, Itaú 341, BB, Bradesco, Caixa, Santander, Inter, C6, XP…), com conta ou cartão;
+3. **nome do arquivo** (ex.: “nubank”, “itau”, “fatura” → cartão).
+
+A lista mostra cada arquivo com o banco reconhecido, o período e a conta (dá para trocar). Banco
+sem conta no app (ex.: OFX do Itaú) ganha um botão **Criar conta**. Arquivo não reconhecido pede a
+conta. **Ver colunas** abre o arquivo para conferir; **Importar N arquivos** importa todos e mostra o
+resultado de cada um. Com um arquivo só, ele abre direto para conferir.
+
 Formatos conferidos com arquivos reais:
 
 | Arquivo | Conta | Observação |
@@ -155,14 +169,17 @@ faça um backup de vez em quando.
 
 ## Build e publicação (GitHub Actions)
 
-O workflow `.github/workflows/android.yml` roda em **push para qualquer branch** e pelo botão
-**Actions → Android → Run workflow** (escolha o branch). Ele:
+O workflow `.github/workflows/android.yml` roda em **push para qualquer branch** (só confere:
+testes, typecheck e compilação, sem Release) e publica uma **versão nova** quando é pedida: commit
+com `[versao]` na mensagem ou o botão **Actions → Android → Run workflow** (escolha o branch).
+Assim as mudanças se acumulam e vão juntas numa versão só. Ele:
 
 1. roda typecheck e testes (Vitest);
 2. faz o build da interface (Vite) e copia para o projeto Android (Capacitor);
 3. compila o APK de release e confere que ele **não** declara a permissão INTERNET;
-4. assina com a sua chave (secrets) e publica uma **Release nova** com tag própria
-   (`v1.<número da execução>`), notas com os commits desde a versão anterior e o APK.
+4. (só quando pedida) assina com a sua chave (secrets) e publica uma **Release nova** com tag
+   `v<versão>` (a primeira de `versoes` em `src/novidades.json`), notas com os itens dessa versão
+   e o APK. Pelo botão, se a versão já existir, vira `v<versão>.<número da execução>`.
    O versionCode é sempre maior que o anterior. Nenhuma Release antiga é apagada.
 5. (opcional) copia o APK para o repositório `<este repositório>-backup` como Release.
 
@@ -249,7 +266,8 @@ Kotlin. minSdk 24 (Android 7.0), targetSdk 36. Detalhes de arquitetura em `CLAUD
 - **Salvar arquivos** (backup/exportação) pelo seletor do Android (“Salvar como”), sem pedir
   permissão de armazenamento.
 - **versionCode** = segundos desde 01/01/2026 (sempre cresce, inclusive entre branches);
-  versionName/tag = `1.<número da execução>`.
+  versionName/tag = número da versão em `src/novidades.json` (1.7, 1.8…), que também guarda o
+  histórico mostrado em **Ajustes → Novidades** e nas notas da Release. Pushes comuns não publicam.
 - **Chave de assinatura EC P-256** (base64 curto para colar no celular), validade de 100 anos.
 - APK assinado com `apksigner` no workflow (a chave nunca passa pelo Gradle nem pelo repositório).
 

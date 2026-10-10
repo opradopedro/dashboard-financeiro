@@ -1,0 +1,37 @@
+{
+  "proxima": [
+    "Importar vários arquivos de uma vez: o app reconhece de qual banco é cada um (Nubank, Rico, Flash, Mercado Pago e OFX de qualquer banco) e já escolhe a conta.",
+    "Arquivo de banco sem conta no app (ex.: Itaú): botão para criar a conta na hora.",
+    "O formato de cada arquivo importado fica salvo; da próxima vez ele é reconhecido mesmo sem ser de um banco conhecido.",
+    "Ajustes > Novidades: histórico do que mudou em cada versão."
+  ],
+  "versoes": [
+    {
+      "versao": "1.6",
+      "data": "2026-10-10",
+      "itens": [
+        "Regra de categoria com trecho editável: dinheiro do Itaú na conta Mercado Pago conta como salário.",
+        "Aplicar às parecidas: dá para escolher o trecho da descrição que vale para a regra."
+      ]
+    },
+    {
+      "versao": "1.5",
+      "data": "2026-10-09",
+      "itens": [
+        "Aviso do app para cada notificação dos bancos, com os botões Ignorar e Adicionar (cria a regra sem abrir o app).",
+        "Tela de regras ordenada por criação e filtrada por origem (padrão, manual, notificação, automática).",
+        "Flash (vale alimentação) monitorado, com conta própria.",
+        "Importação do PDF do Mercado Pago, fatura Nubank, fatura Rico e extrato Flash.",
+        "Visual novo, escuro, com Montserrat.",
+        "Conta padrão por app monitorado."
+      ]
+    },
+    {
+      "versao": "1.4",
+      "data": "2026-10-09",
+      "itens": [
+        "Primeira versão assinada: notificações dos bancos viram transações, regras editáveis, importação de extratos sem duplicar, painel do mês, backup e exportação finai-banco/1."
+      ]
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 import { parseData, parseValor } from '../core/util';
 import type { LinhaBruta } from '../core/juntar';
 
-export interface Ofx { cartao: boolean; contaId: string; banco: string; linhas: LinhaBruta[] }
+export interface Ofx { cartao: boolean; contaId: string; banco: string; bankId: string; linhas: LinhaBruta[] }
 
 const tag = (bloco: string, nome: string) => {
   const m = new RegExp(`<${nome}>([^<\\r\\n]*)`, 'i').exec(bloco);
@@ -13,7 +13,8 @@ export function lerOfx(texto: string): Ofx {
   if (!/<OFX>/i.test(texto)) throw new Error('Este arquivo não parece um OFX (falta a marca <OFX>).');
   const cartao = /<CCSTMTRS>/i.test(texto);
   const contaId = tag(texto, 'ACCTID');
-  const banco = tag(texto, 'ORG') || tag(texto, 'BANKID');
+  const bankId = tag(texto, 'BANKID');
+  const banco = tag(texto, 'ORG') || bankId;
   const linhas: LinhaBruta[] = [];
   const re = /<STMTTRN>([\s\S]*?)(?=<\/STMTTRN>|<STMTTRN>|<\/BANKTRANLIST>)/gi;
   let m: RegExpExecArray | null;
@@ -27,5 +28,5 @@ export function lerOfx(texto: string): Ofx {
     const fitid = tag(b, 'FITID');
     linhas.push({ data, valor, desc, ...(fitid ? { id: fitid } : {}) });
   }
-  return { cartao, contaId, banco, linhas };
+  return { cartao, contaId, banco, bankId, linhas };
 }

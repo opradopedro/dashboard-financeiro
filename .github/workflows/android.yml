@@ -1,7 +1,9 @@
-# Testes, typecheck, build e APK assinado publicado em Releases.
-# Roda em push para qualquer branch e pelo botão "Run workflow" (Actions → Android → Run workflow).
-# Cada execução gera uma versão nova (versionCode sempre maior) com tag e Release próprios;
-# nenhuma Release antiga é apagada.
+# Testes, typecheck, build e APK em todo push (para conferir que nada quebrou).
+# A Release (APK assinado para instalar) só sai quando é pedida:
+#   - commit com "[versao]" na mensagem (é assim que o Claude publica), ou
+#   - botão "Run workflow" (Actions → Android → Run workflow).
+# O número e a lista do que mudou vêm de src/novidades.json (a primeira de "versoes").
+# Nenhuma Release antiga é apagada.
 name: Android
 
 on:
@@ -20,6 +22,7 @@ jobs:
     outputs:
       nome: ${{ steps.versao.outputs.nome }}
       codigo: ${{ steps.versao.outputs.codigo }}
+      publicar: ${{ steps.versao.outputs.publicar }}
     steps:
       - uses: actions/checkout@v5
 
@@ -36,14 +39,29 @@ jobs:
 
       - name: Número da versão
         id: versao
+        env:
+          EVENTO: ${{ github.event_name }}
+          MENSAGEM: ${{ github.event.head_commit.message }}
         run: |
           # versionCode: segundos desde 01/01/2026 — sempre cresce, mesmo entre branches e re-execuções.
           CODIGO=$(( $(date -u +%s) - 1767225600 ))
-          NOME="1.${{ github.run_number }}"
-          if [ "${{ github.run_attempt }}" != "1" ]; then NOME="$NOME.${{ github.run_attempt }}"; fi
+          V=$(node -p "require('./src/novidades.json').versoes[0].versao")
+          PUBLICAR=false
+          if [ "$EVENTO" = "workflow_dispatch" ] || printf '%s' "$MENSAGEM" | grep -qF '[versao]'; then PUBLICAR=true; fi
+          if [ "$PUBLICAR" = "true" ]; then
+            NOME="$V"
+            # Versão já publicada (ex.: botão Run workflow sem número novo): vira $V.<execução>.
+            if git ls-remote --exit-code --tags origin "refs/tags/v$V" >/dev/null 2>&1; then NOME="$V.${{ github.run_number }}"; fi
+          else
+            NOME="$V-teste.${{ github.run_number }}"
+          fi
           echo "codigo=$CODIGO" >> "$GITHUB_OUTPUT"
           echo "nome=$NOME" >> "$GITHUB_OUTPUT"
-          echo "Versão $NOME (versionCode $CODIGO)"
+          echo "publicar=$PUBLICAR" >> "$GITHUB_OUTPUT"
+          echo "Versão $NOME (versionCode $CODIGO), publicar: $PUBLICAR"
+          if [ "$PUBLICAR" != "true" ]; then
+            echo "### Sem Release: este push só confere testes e compilação. As mudanças ficam para a próxima versão." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - run: npm ci
       - run: npm run typecheck
@@ -79,6 +97,7 @@ jobs:
   publicar:
     name: Assinar e publicar Release
     needs: build
+    if: needs.build.outputs.publicar == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
@@ -149,18 +168,15 @@ jobs:
           NOME: ${{ needs.build.outputs.nome }}
           CODIGO: ${{ needs.build.outputs.codigo }}
         run: |
-          git fetch --tags --force --quiet
-          ANT=$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)
           {
-            echo "**Versão $NOME** (versionCode $CODIGO) · branch \`${GITHUB_REF_NAME}\` · commit ${GITHUB_SHA::7}"
+            echo "**Versão $NOME** (versionCode $CODIGO), branch \`${GITHUB_REF_NAME}\`, commit ${GITHUB_SHA::7}"
             echo
             echo "### O que mudou"
-            if [ -n "$ANT" ]; then
-              MUD=$(git log --no-merges --pretty='- %s' "$ANT..HEAD")
-              if [ -n "$MUD" ]; then echo "$MUD"; echo; echo "_Desde $ANT._"; else echo "- Nenhuma mudança de código desde $ANT (nova compilação)."; fi
-            else
-              git log --no-merges --pretty='- %s' -n 30 HEAD
-            fi
+            node -e '
+              const n = require("./src/novidades.json"), nome = process.env.NOME, v = n.versoes[0];
+              const itens = nome === v.versao ? v.itens : n.proxima.length ? n.proxima : ["Compilação nova da versão " + v.versao + ", sem mudanças listadas."];
+              console.log(itens.map(i => "- " + i).join("\n"));
+            '
             echo
             echo "### Como instalar"
             echo "Baixe **$APK** abaixo (em Assets) no celular e abra. Atualizações instalam por cima sem perder os dados."

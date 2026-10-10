@@ -16,7 +16,14 @@ passo manual dele precisa ser possível pelo navegador do celular, com passo a p
 - **finai-banco/1** é o formato do carteira (`opradopedro/carteira`, `src/banco/arquivo.ts`). Não
   invente campos: exportação em `src/core/finai.ts` com teste que fixa as chaves.
 - **Mesma chave de assinatura para sempre** (secrets do repositório). A keystore nunca entra no git.
-- Cada push gera Release nova; não apague Releases nem tags.
+- **Versões acumuladas.** Push comum NÃO gera Release (o workflow só testa e compila). Cada mudança
+  pedida entra como item em `proxima` de `src/novidades.json` (frase curta, do ponto de vista de
+  quem usa). Só quando o dono pedir "atualizar a versão do APK":
+  1. mover os itens de `proxima` para uma entrada nova no topo de `versoes`
+     (`versao` = anterior + 0.1, ex.: 1.7 → 1.8; `data` = hoje AAAA-MM-DD) e deixar `proxima: []`;
+  2. commit com `[versao]` na mensagem, push, acompanhar o workflow até a Release `v<versão>`;
+  3. responder no chat com o link da Release e a lista do que mudou (os mesmos itens).
+  O app mostra o histórico em Ajustes → Novidades. Não apague Releases nem tags.
 
 ## Comandos
 
@@ -49,12 +56,13 @@ src/
     juntar.ts      deduplicação de extrato, revisão, conferência mensal
     finai.ts       exportar/ler finai-banco/1
     backup.ts      backup/restauração e sanear() (valida dados do banco local e de backups)
-  importar/        csv.ts, ofx.ts, pdf.ts (pdf.js; tabela Data/Descrição/ID/Valor/Saldo), planilha.ts
+  importar/        detectar.ts (banco/conta do arquivo: modelo salvo > formato > nome), csv.ts, ofx.ts, pdf.ts (pdf.js; tabela Data/Descrição/ID/Valor/Saldo), planilha.ts
                    (SheetJS sob demanda), mapear.ts (inclui saldo e parcela), texto.ts
   dados/db.ts      IndexedDB: um registro 'dados' com tudo, gravado inteiro a cada mudança
   nativo/notificacoes.ts  ponte com o plugin Kotlin (+ imitação para navegador)
   app.ts           estado, mudar() (fila de gravações), consumirFila(), classificadas() com cache
   ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts
+  novidades.json   histórico de versões + `proxima` (pendentes); gera as notas da Release
   main.ts          tabela de telas, navegação por data-ir/data-aba, inicialização
 android/           projeto Capacitor versionado
   app/src/main/java/app/dashboardfinanceiro/
@@ -98,6 +106,8 @@ Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INI
 - Painel conta só `entrada` e `saida`. Estorno no cartão = `saida` com valor positivo.
 
 ### Extratos e deduplicação (`juntar.ts`)
+- Importação aceita vários arquivos: `detectarFonte` (modelo salvo > cabeçalho/PDF/OFX > nome do
+  arquivo) e `contaDaFonte` (mesmo banco e tipo) escolhem a conta; em lote o modelo é sempre salvo.
 - Chave de linha: `id:<conta>:<FITID ou id>` ou `<conta>|<data>|<valor>|<desc normalizada>|<ordem>`.
 - Linha com chave conhecida (em transação, em revisão ou em `excluidas`) = repetida.
 - Candidatos: mesma conta, mesmo valor, sem extrato, até 3 dias. Um só e até 1 dia → une
@@ -134,7 +144,8 @@ cartões iguais para tudo. A peça marcante é o topo do Painel (mês grande + f
   (padrao, manual, notificacao, automatica) e `criadaEm`.
 - Formatos reais conferidos: PDF Mercado Pago, fatura Rico CSV, fatura Nubank CSV, extrato Flash CSV
   (testes em `tests/extratos-reais.test.ts`, com dados trocados; nunca versionar arquivos do usuário).
-- versionCode = segundos desde 01/01/2026; tag `v1.<run_number>` (`.<tentativa>` em re-execução).
+- versionCode = segundos desde 01/01/2026; tag `v<versão de novidades.json>` (pelo botão, se já
+  existe, `v<versão>.<run_number>`); builds sem Release usam `<versão>-teste.<run_number>`.
 - APK assinado no workflow com `apksigner` (v2+v3), chave EC P-256 em secrets:
   `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
 - Espelho opcional: secret `BACKUP_REPO_TOKEN`, destino `vars.BACKUP_REPO` ou `<repo>-backup`.

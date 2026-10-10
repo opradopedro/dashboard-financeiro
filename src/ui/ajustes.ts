@@ -55,7 +55,8 @@ export function telaAjustes(el: HTMLElement) {
     ${[['apps', 'Apps monitorados', `${d.apps.filter(a => a.ativo).length} ativos`], ['regras', 'Regras', `${d.regras.length} de notificação, ${d.regrasCat.length} de categoria`],
        ['contas', 'Contas', `${d.contas.length} contas`], ['categorias', 'Categorias e palavras-chave', `${d.categorias.length} categorias`],
        ['dados', 'Backup, restauração e exportação', 'Arquivo do app e finai-banco/1'],
-       ['boasvindas', 'Guia de permissões', 'Notificações, avisos e bateria']]
+       ['boasvindas', 'Guia de permissões', 'Notificações, avisos e bateria'],
+       ['novidades', 'Novidades', `O que mudou em cada versão`]]
       .map(([r, t, s]) => `<button type="button" class="item" data-ir="${r}"><div class="name">${t}</div><div class="val"></div><div class="meta">${s}</div><div class="meta r"></div></button>`).join('')}
   </div></div>
   ${painelAvisos()}

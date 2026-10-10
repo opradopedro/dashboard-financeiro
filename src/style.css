@@ -209,3 +209,18 @@ nav .num{position:absolute;top:4px;left:calc(50% + 6px);min-width:17px;height:17
 .anim{animation:surge .18s ease-out}
 @media (prefers-reduced-motion: reduce){.anim{animation:none}}
 @media (max-width:370px){ form,.form{grid-template-columns:1fr} body{padding-inline:16px} .top,.seg{margin-inline:-16px;padding-inline:16px} }
+
+/* ---------- importação de vários arquivos ---------- */
+.arqs{display:flex;flex-direction:column}
+.arq{display:flex;flex-direction:column;gap:8px;padding:14px 0;border-top:1px solid var(--linha)}
+.arq:first-child{border-top:0;padding-top:4px}
+.arq-cab{display:flex;flex-direction:column;gap:2px;min-width:0}
+.arq-cab b{font-weight:550;font-size:14.5px;overflow-wrap:anywhere}
+.arq-acoes{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+.arq-acoes select{min-height:40px;padding:8px 12px;font-size:14px}
+.arq .tirar{align-self:flex-start;border:0;background:none;padding:2px 0;color:var(--grafite);font-size:12.5px;text-decoration:underline;text-underline-offset:3px}
+.arq-acoes>:only-child{justify-self:start}
+
+/* ---------- novidades ---------- */
+.novidades{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.55}
+.novidades li::marker{color:var(--champanhe)}

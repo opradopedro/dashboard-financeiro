@@ -18,6 +18,7 @@ import { telaNotif, telaNotificacoes, telaSimular } from './ui/notificacoes';
 import { telaRegra, telaRegras } from './ui/regras';
 import { telaConferencia, telaImportar, telaRevisao } from './ui/importar';
 import { telaApps, telaAjustes, telaBoasVindas, telaCategorias, telaConta, telaContas, telaDados } from './ui/ajustes';
+import { telaNovidades } from './ui/novidades';
 
 interface Tela { titulo: string | ((r: Rota) => string); render: (el: HTMLElement, r: Rota) => void; vivo?: boolean }
 
@@ -44,6 +45,7 @@ const TELAS: Record<string, Tela> = {
   categorias: { titulo: 'Categorias', render: el => telaCategorias(el) },
   regrascat: { titulo: 'Regras', render: el => telaRegras(el, { nome: 'regras', params: [], query: new URLSearchParams('tipo=cat') }), vivo: true },
   dados: { titulo: 'Dados', render: el => telaDados(el) },
+  novidades: { titulo: 'Novidades', render: el => telaNovidades(el) },
   boasvindas: { titulo: 'Permissões', render: el => telaBoasVindas(el), vivo: true },
 };
 

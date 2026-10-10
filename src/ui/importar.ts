@@ -1,12 +1,13 @@
-// Importação de extratos (CSV, Excel, OFX e finai-banco/1), revisão de casos duvidosos e
-// conferência mensal por conta.
+// Importação de extratos (PDF, CSV, Excel, OFX e finai-banco/1), um ou vários arquivos de uma vez,
+// com a instituição reconhecida pelo formato; revisão de casos duvidosos e conferência mensal.
 import { mudar, nomeConta, state } from '../app';
 import { chavesDasLinhas, conferencia, importarLinhas, resolverRevisao, saldoMaisRecente, type LinhaBruta } from '../core/juntar';
 import { itensPdf, lerExtratoPdf, type ExtratoPdf } from '../importar/pdf';
 import { lerFinai, linhasFinai, type LidoFinai } from '../core/finai';
 import type { Conta, Importacao, Mapeamento } from '../core/tipos';
-import { hoje, somaMes, uid } from '../core/util';
+import { hoje, slug, somaMes, uid } from '../core/util';
 import { lerCsv } from '../importar/csv';
+import { contaDaFonte, detectarFonte, type ArquivoLido, type Fonte } from '../importar/detectar';
 import { aplicarMapeamento, assinatura, modeloPara, sugerirMapeamento } from '../importar/mapear';
 import { lerOfx, type Ofx } from '../importar/ofx';
 import { lerPlanilha, type Celula } from '../importar/planilha';
@@ -19,7 +20,8 @@ interface Sessao {
   arquivo: string;
   tipo: 'tabela' | 'ofx' | 'finai' | 'pdf';
   pdf?: ExtratoPdf;
-  conta: string;
+  conta: string;            // '' = ainda não escolhida
+  fonte?: Fonte | null;     // instituição reconhecida
   rows?: Celula[][];
   abas?: string[];
   aba?: string;
@@ -33,21 +35,20 @@ interface Sessao {
   erro?: string;
   resultado?: Importacao[];
 }
-let sessao: Sessao | null = null;
+/** Arquivos escolhidos (um ou vários), o aberto em detalhe (-1 = lista) e o resumo final. */
+let lote: Sessao[] = [];
+let aberto = -1;
+let resumo: Sessao[] | null = null;
+let ocupado = false;
 
 const COLS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const nomeCol = (i: number) => (i < 26 ? COLS[i] : 'A' + COLS[i - 26]);
 
 export function telaImportar(el: HTMLElement) {
   const d = state.dados;
-  const contas = d.contas.filter(c => c.ativa);
-  const conta = sessao?.conta || contas[0]?.id || '';
   el.innerHTML = `<section class="panel">
-    <p class="sub">Extrato da conta ou fatura do cartão, em PDF do Mercado Pago, CSV, Excel, OFX ou finai-banco/1. Importar de novo o mesmo arquivo não duplica, e o que já tinha vindo por notificação ou à mão é unido à linha do extrato.</p>
-    <div class="form">
-      <div class="field full"><label for="iConta">Conta do arquivo</label><select id="iConta">${opcoes(contas.map(c => ({ v: c.id, t: c.nome })), conta)}</select></div>
-    </div>
-    <div class="row"><label class="btn primary" for="iArq">Escolher arquivo<input type="file" id="iArq" accept=".pdf,.csv,.txt,.xlsx,.xls,.ofx,.qfx,.json,application/pdf,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/x-ofx,*/*"></label>
+    <p class="sub">Extrato da conta ou fatura do cartão, em PDF do Mercado Pago, CSV, Excel, OFX ou finai-banco/1. Pode escolher vários arquivos de uma vez: o app reconhece o banco de cada um. Importar de novo o mesmo arquivo não duplica, e o que já tinha vindo por notificação ou à mão é unido à linha do extrato.</p>
+    <div class="row"><label class="btn primary" for="iArq">Escolher arquivos<input type="file" id="iArq" multiple accept=".pdf,.csv,.txt,.xlsx,.xls,.ofx,.qfx,.json,application/pdf,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/x-ofx,*/*"></label>
       <button type="button" class="btn" data-ir="revisao">Revisão${d.revisoes.length ? ` (${d.revisoes.length})` : ''}</button>
       <button type="button" class="btn" data-ir="conferencia">Conferir mês</button></div>
   </section>
@@ -57,29 +58,50 @@ export function telaImportar(el: HTMLElement) {
     <div class="meta">${esc(nomeConta(i.conta))}, de ${fmtD(i.de)} a ${fmtD(i.ate)}</div>
     <div class="meta r">${i.novas} novas, ${i.unidas} unidas${i.revisao ? `, ${i.revisao} em revisão` : ''}${i.repetidas ? `, ${i.repetidas} repetidas` : ''}</div></div>`).join('') || '<div class="empty">Nenhum arquivo importado ainda.</div>'}</div></div></section>`;
 
-  $('#iConta').onchange = () => { if (sessao) { sessao.conta = ($('#iConta') as HTMLSelectElement).value; sessao.modelo = undefined; aplicarModelo(); passo(); } };
   ($('#iArq') as HTMLInputElement).onchange = async e => {
-    const f = (e.target as HTMLInputElement).files?.[0];
-    (e.target as HTMLInputElement).value = '';
-    if (!f) return;
-    sessao = { arquivo: f.name, tipo: 'tabela', conta: ($('#iConta') as HTMLSelectElement).value };
-    try { await abrirArquivo(f); } catch (err) { sessao.erro = (err as Error).message; }
+    const inp = e.target as HTMLInputElement;
+    const arqs = Array.from(inp.files || []);
+    inp.value = '';
+    if (!arqs.length) return;
+    // Lote novo: tira o que já foi importado ou deu erro.
+    resumo = null;
+    lote = lote.filter(x => !x.erro && !x.resultado);
+    const p = document.getElementById('iPasso');
+    if (p) p.innerHTML = `<section class="caixa"><div class="sub">Lendo ${arqs.length === 1 ? 'o arquivo' : `${arqs.length} arquivos`}…</div></section>`;
+    for (const f of arqs) {
+      const s = await abrirArquivo(f);
+      // Mesmo arquivo escolhido de novo (e ainda não importado): fica a leitura nova.
+      const i = lote.findIndex(x => x.arquivo === s.arquivo && !x.resultado);
+      if (i >= 0) lote[i] = s; else lote.push(s);
+    }
+    aberto = lote.length === 1 ? 0 : -1;
     passo();
   };
   passo();
 }
 
-async function abrirArquivo(f: File) {
-  const s = sessao!;
+/** Lê o arquivo, reconhece a instituição e escolhe a conta. Erros ficam na sessão. */
+async function abrirArquivo(f: File): Promise<Sessao> {
+  const s: Sessao = { arquivo: f.name, tipo: 'tabela', conta: '' };
+  try {
+    const lido = await ler(f, s);
+    if (lido) {
+      s.fonte = detectarFonte(lido, state.dados.modelos);
+      s.conta = (s.fonte && contaDaFonte(s.fonte, state.dados.contas)) || '';
+    }
+    aplicarModelo(s);
+  } catch (err) { s.erro = (err as Error).message; }
+  return s;
+}
+
+async function ler(f: File, s: Sessao): Promise<ArquivoLido | null> {
   const buf = await f.arrayBuffer();
   const nome = f.name.toLowerCase();
   if (/\.pdf$/.test(nome) || new TextDecoder().decode(new Uint8Array(buf.slice(0, 5))) === '%PDF-') {
+    const itens = await itensPdf(buf);
     s.tipo = 'pdf';
-    s.pdf = lerExtratoPdf(await itensPdf(buf));
-    // Extrato do Mercado Pago: sugere a conta do Mercado Pago (não o cartão).
-    const sug = s.pdf.banco && state.dados.contas.find(c => c.ativa && c.tipo === 'corrente' && c.banco.toLowerCase() === s.pdf!.banco.toLowerCase());
-    if (sug) s.conta = sug.id;
-    return;
+    s.pdf = lerExtratoPdf(itens);
+    return { nome: f.name, textoPdf: itens.map(i => i.texto).join(' ') };
   }
   if (/\.(xlsx|xls|xlsm)$/.test(nome)) {
     const p = await lerPlanilha(buf);
@@ -91,24 +113,24 @@ async function abrirArquivo(f: File) {
       s.tipo = 'ofx'; s.ofx = lerOfx(texto);
       s.inverter = false;
       if (!s.ofx.linhas.length) throw new Error('Não achei transações neste OFX.');
-      return;
+      return { nome: f.name, ofx: { cartao: s.ofx.cartao, banco: s.ofx.banco, bankId: s.ofx.bankId } };
     }
     if (/\.json$/.test(nome) || /^\s*\{/.test(texto)) {
       s.tipo = 'finai'; s.finai = lerFinai(texto);
       s.destino = Object.fromEntries(s.finai.contas.map(c => [c.id, state.dados.contas.some(x => x.id === c.id) ? c.id : '']));
-      return;
+      return null;
     }
     s.rows = lerCsv(texto);
   }
   if (!s.rows?.length) throw new Error('O arquivo está vazio.');
-  aplicarModelo();
+  return { nome: f.name, rows: s.rows };
 }
 
 /** Usa o modelo salvo da conta (mesmo cabeçalho) ou sugere o mapeamento. */
-function aplicarModelo() {
-  const s = sessao;
-  if (!s || s.tipo !== 'tabela' || !s.rows) return;
-  const md = modeloPara(state.dados.modelos, s.conta, s.rows);
+function aplicarModelo(s: Sessao) {
+  if (s.tipo !== 'tabela' || !s.rows) return;
+  s.modelo = undefined;
+  const md = s.conta ? modeloPara(state.dados.modelos, s.conta, s.rows) : null;
   if (md) { s.map = { ...md }; s.modelo = md.id; return; }
   s.map = sugerirMapeamento(s.rows);
   // Fatura de cartão costuma trazer as compras positivas: se a maioria for positiva, inverte.
@@ -119,15 +141,29 @@ function aplicarModelo() {
   }
 }
 
+/** Linhas prontas para importar (tabela com o mapeamento, OFX com a inversão, PDF como veio). */
+function linhasDe(s: Sessao): LinhaBruta[] {
+  if (s.tipo === 'tabela') return s.rows && s.map ? aplicarMapeamento(s.rows, s.map).linhas : [];
+  if (s.tipo === 'ofx') return s.ofx!.linhas.map(l => ({ ...l, valor: s.inverter ? -l.valor : l.valor }));
+  if (s.tipo === 'pdf') return s.pdf!.linhas;
+  return [];
+}
+
+const pronta = (s: Sessao) => !s.erro && !s.resultado && (s.tipo === 'finai' || (!!s.conta && linhasDe(s).length > 0));
+
 function passo() {
   const el = document.getElementById('iPasso');
   if (!el) return;
-  const s = sessao;
-  if (!s) { el.innerHTML = ''; return; }
-  if (s.erro) { el.innerHTML = `<section class="caixa"><div class="err">${esc(s.arquivo)}: ${esc(s.erro)}</div></section>`; return; }
-  if (s.resultado) {
-    el.innerHTML = painelResultado(s.resultado);
-    $('#btnNovoArq').onclick = () => { sessao = null; passo(); };
+  if (resumo) {
+    el.innerHTML = painelResultado(resumo);
+    $('#btnNovoArq').onclick = () => { lote = []; resumo = null; aberto = -1; passo(); };
+    return;
+  }
+  if (!lote.length) { el.innerHTML = ''; return; }
+  const s = aberto >= 0 ? lote[aberto] : null;
+  if (!s) { passoLote(el); return; }
+  if (s.erro) {
+    el.innerHTML = `<section class="caixa"><h2>${esc(s.arquivo)}</h2><div class="err">${esc(s.erro)}</div></section>`;
     return;
   }
   if (s.tipo === 'tabela') passoTabela(el, s);
@@ -135,6 +171,133 @@ function passo() {
   else if (s.tipo === 'pdf') passoPdf(el, s);
   else passoFinai(el, s);
 }
+
+/** Sai do detalhe: com um arquivo só, descarta; com vários, volta para a lista. */
+function fechar() {
+  if (lote.length <= 1) lote = [];
+  aberto = -1;
+  passo();
+}
+
+/** Depois de importar um arquivo pelo detalhe: resumo (se acabou o lote) ou volta para a lista. */
+function terminouUm() {
+  aberto = -1;
+  if (lote.every(x => x.resultado || x.erro)) resumo = lote.filter(x => x.resultado);
+  dispatchEvent(new Event('rerender')); // refaz a tela inteira (lista de já importados)
+}
+
+// ---------- Lista de arquivos ----------
+
+const tipoConta = (t?: string) => (t === 'cartao' ? 'cartão' : 'conta');
+const nomeNova = (f: Fonte) => `${f.banco} ${f.tipo === 'cartao' ? 'crédito' : 'conta'}`;
+
+/** Instituição reconhecida (ou não) e o que falta para importar. */
+function linhaFonte(s: Sessao, i: number) {
+  if (s.tipo === 'finai') return `<div class="note">Backup finai-banco/1 com ${s.finai!.contas.length === 1 ? '1 conta' : `${s.finai!.contas.length} contas`}. Cada conta do arquivo entra na conta de mesmo código, ou numa conta nova.</div>`;
+  const f = s.fonte;
+  if (!f) return s.conta ? '' : `<div class="note">Não reconheci o banco deste arquivo. Escolha a conta.</div>`;
+  if (s.conta) return `<div class="note">Reconhecido: ${esc(f.rotulo)}.</div>`;
+  if (f.banco) return `<div class="note">Parece ${esc(f.rotulo)}, mas não há ${f.tipo ? tipoConta(f.tipo) + ' ' : 'conta '}${esc(f.banco)} no app.</div>
+    <div class="row"><button type="button" class="btn small" data-criar="${i}">Criar “${esc(nomeNova(f))}”</button></div>`;
+  return `<div class="note">Reconhecido: ${esc(f.rotulo)}. Escolha a conta.</div>`;
+}
+
+function seletorConta(s: Sessao, attr: string) {
+  const contas = state.dados.contas.filter(c => c.ativa || c.id === s.conta);
+  return `<select ${attr}>${opcoes([{ v: '', t: 'Escolha a conta' }, ...contas.map(c => ({ v: c.id, t: c.nome }))], s.conta)}</select>`;
+}
+
+function infoLinhas(s: Sessao) {
+  if (s.tipo === 'finai') return `${[...s.finai!.porConta.values()].reduce((a, l) => a + l.length, 0)} transações`;
+  const l = linhasDe(s);
+  if (!l.length) return 'nenhuma linha reconhecida';
+  const ds = l.map(x => x.data).sort();
+  return `${l.length === 1 ? '1 linha' : `${l.length} linhas`}, de ${fmtD(ds[0])} a ${fmtD(ds[ds.length - 1])}`;
+}
+
+function passoLote(el: HTMLElement) {
+  const prontas = lote.filter(pronta);
+  const pendentes = lote.filter(s => !s.erro && !s.resultado && !pronta(s));
+  el.innerHTML = `<section class="caixa">
+    <h2>${lote.length} arquivos</h2>
+    <div class="arqs">${lote.map((s, i) => `<div class="arq">
+      <div class="arq-cab"><b>${esc(s.arquivo)}</b>${s.erro ? '' : `<span class="sub">${infoLinhas(s)}</span>`}</div>
+      ${s.erro ? `<div class="err">${esc(s.erro)}</div>`
+        : s.resultado ? `<div class="ok">Importado em ${esc(s.resultado.map(r => nomeConta(r.conta)).join(', '))}: ${resumoImp(s.resultado)}.</div>`
+        : `${linhaFonte(s, i)}
+      <div class="arq-acoes">${s.tipo === 'finai' ? '' : seletorConta(s, `data-conta="${i}" aria-label="Conta de ${esc(s.arquivo)}"`)}
+        <button type="button" class="btn small" data-ver="${i}">${s.tipo === 'tabela' ? 'Ver colunas' : 'Ver linhas'}</button></div>`}
+      ${s.resultado ? '' : `<button type="button" class="tirar" data-tirar="${i}" aria-label="Tirar ${esc(s.arquivo)} da lista">Tirar da lista</button>`}
+    </div>`).join('')}</div>
+    ${pendentes.length ? `<div class="note">${pendentes.length === 1 ? 'Um arquivo precisa' : `${pendentes.length} arquivos precisam`} de conta ou de ajuste nas colunas antes de importar.</div>` : ''}
+    <div class="row"><button type="button" class="btn primary" id="btnImpLote"${prontas.length && !ocupado ? '' : ' disabled'}>${ocupado ? 'Importando…' : prontas.length === 1 ? 'Importar 1 arquivo' : `Importar ${prontas.length} arquivos`}</button>
+      <button type="button" class="btn" id="btnLimpar">Cancelar</button></div>
+  </section>`;
+  el.querySelectorAll<HTMLSelectElement>('[data-conta]').forEach(x => (x.onchange = () => {
+    const s = lote[Number(x.dataset.conta)];
+    s.conta = x.value;
+    aplicarModelo(s);
+    passo();
+  }));
+  el.querySelectorAll<HTMLButtonElement>('[data-ver]').forEach(b => (b.onclick = () => { aberto = Number(b.dataset.ver); passo(); scrollTo(0, 0); }));
+  el.querySelectorAll<HTMLButtonElement>('[data-tirar]').forEach(b => (b.onclick = () => { lote.splice(Number(b.dataset.tirar), 1); aberto = lote.length === 1 ? 0 : -1; passo(); }));
+  ligarCriar(el);
+  $('#btnLimpar').onclick = () => { lote = []; aberto = -1; passo(); };
+  $('#btnImpLote').onclick = async () => {
+    if (ocupado) return;
+    ocupado = true;
+    passo();
+    try {
+      for (const s of lote.filter(pronta)) {
+        if (s.tipo === 'finai') s.resultado = await importarFinai(s);
+        else {
+          s.resultado = [await importar(s.conta, linhasDe(s), s.arquivo)];
+          if (s.tipo === 'tabela') await salvarModelo(s);
+        }
+      }
+    } catch (err) {
+      toast(`Erro ao importar: ${(err as Error).message}`);
+    } finally { ocupado = false; }
+    if (lote.every(x => x.resultado || x.erro)) resumo = lote.filter(x => x.resultado);
+    dispatchEvent(new Event('rerender'));
+  };
+}
+
+/** Botão "Criar conta" de uma instituição sem conta no app: cria e usa em todos os arquivos dela. */
+function ligarCriar(el: HTMLElement) {
+  el.querySelectorAll<HTMLButtonElement>('[data-criar]').forEach(b => (b.onclick = async () => {
+    const f = lote[Number(b.dataset.criar)]?.fonte;
+    if (!f?.banco) return;
+    const tipo = f.tipo || 'corrente';
+    const base = slug(`${f.banco}-${tipo === 'cartao' ? 'cartao' : 'conta'}`);
+    let id = base;
+    for (let n = 2; state.dados.contas.some(c => c.id === id); n++) id = `${base}-${n}`;
+    const nova: Conta = { id, nome: nomeNova({ ...f, tipo }), banco: f.banco, tipo, ativa: true };
+    await mudar(d => ({ ...d, contas: [...d.contas, nova] }));
+    for (const s of lote) if (!s.conta && !s.resultado && s.fonte?.banco === f.banco && (s.fonte.tipo || 'corrente') === tipo) { s.conta = id; aplicarModelo(s); }
+    toast(`Conta “${nova.nome}” criada.`);
+    passo();
+  }));
+}
+
+// ---------- Um arquivo em detalhe ----------
+
+/** Cabeçalho do detalhe: nome, instituição reconhecida e a conta. */
+function cabecalho(s: Sessao) {
+  return `<div class="row between"><h2>${esc(s.arquivo)}</h2>${lote.length > 1 ? '<button type="button" class="btn small" id="btnLista">Voltar à lista</button>' : ''}</div>
+    ${linhaFonte(s, aberto)}
+    <div class="field"><label for="iConta">Conta do arquivo</label>${seletorConta(s, 'id="iConta"')}</div>`;
+}
+
+function ligarCabecalho(el: HTMLElement, s: Sessao) {
+  $('#iConta').onchange = () => { s.conta = ($('#iConta') as HTMLSelectElement).value; aplicarModelo(s); passo(); };
+  $('#btnLista')?.addEventListener('click', () => { aberto = -1; passo(); });
+  $('#btnCancelar').onclick = fechar;
+  ligarCriar(el);
+}
+
+const botaoImportar = (s: Sessao, n: number) => `<button type="button" class="btn primary" id="btnImp"${n && s.conta ? '' : ' disabled'}>${s.conta ? `Importar ${n} linhas em ${esc(nomeConta(s.conta))}` : 'Escolha a conta para importar'}</button>`;
+const botaoCancelar = () => `<button type="button" class="btn" id="btnCancelar">${lote.length > 1 ? 'Voltar' : 'Cancelar'}</button>`;
 
 function previa(linhas: LinhaBruta[], extra = '') {
   return `<div class="tabela"><table><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>
@@ -152,7 +315,7 @@ function passoTabela(el: HTMLElement, s: Sessao) {
   const conv = aplicarMapeamento(rows, m);
   const modelo = s.modelo ? state.dados.modelos.find(x => x.id === s.modelo) : null;
   el.innerHTML = `<section class="caixa">
-    <h2>${esc(s.arquivo)}</h2>
+    ${cabecalho(s)}
     ${modelo ? `<div class="ok">Usando o modelo salvo “${esc(modelo.nome)}” desta conta.</div>` : '<div class="sub">Confira as colunas. O mapeamento fica salvo como modelo desta conta para a próxima vez.</div>'}
     <form id="fMap" class="form">
       ${s.abas && s.abas.length > 1 ? `<div class="field full"><label for="mAba">Aba da planilha</label><select id="mAba">${opcoes(s.abas.map(a => ({ v: a, t: a })), s.aba)}</select></div>` : ''}
@@ -166,13 +329,12 @@ function passoTabela(el: HTMLElement, s: Sessao) {
       <div class="field"><label for="mDeb">Débito (saídas)</label><select id="mDeb">${opcoes(cols(true), String(m.colDebito))}</select></div>` : ''}
       <div class="field"><label for="mSaldo">Saldo (opcional)</label><select id="mSaldo">${opcoes(cols(true), String(m.colSaldo))}</select></div>
       <label class="check full"><input type="checkbox" id="mInv"${m.inverter ? ' checked' : ''}> Inverter sinal (no arquivo, gasto aparece positivo — comum em fatura de cartão)</label>
-      <label class="check full"><input type="checkbox" id="mSalvar" checked> Salvar como modelo desta conta</label>
+      ${lote.length > 1 ? '' : '<label class="check full"><input type="checkbox" id="mSalvar" checked> Salvar como modelo desta conta</label>'}
     </form>
     <h3>Pré-visualização</h3>
     ${previa(conv.linhas, conv.ignoradas.length ? `; ${conv.ignoradas.length} ignoradas` : '')}
     ${conv.ignoradas.length ? `<details class="como"><summary>Linhas ignoradas</summary><p>${conv.ignoradas.slice(0, 40).map(i => `linha ${i.linha}: ${i.motivo}`).join('<br>')}</p></details>` : ''}
-    <div class="row"><button type="button" class="btn primary" id="btnImp"${conv.linhas.length ? '' : ' disabled'}>Importar ${conv.linhas.length} linhas em ${esc(nomeConta(s.conta))}</button>
-      <button type="button" class="btn" id="btnCancelar">Cancelar</button></div>
+    <div class="row">${botaoImportar(s, conv.linhas.length)}${botaoCancelar()}</div>
   </section>`;
   const num = (id: string) => Number(($(id) as HTMLSelectElement | null)?.value ?? -1);
   const atualizar = () => {
@@ -188,83 +350,86 @@ function passoTabela(el: HTMLElement, s: Sessao) {
     passo();
   };
   el.querySelectorAll('#fMap select:not(#mAba), #mInv').forEach(x => x.addEventListener('change', atualizar));
-  $('#mAba')?.addEventListener('change', () => { s.aba = ($('#mAba') as HTMLSelectElement).value; s.rows = s.lerAba!(s.aba); s.modelo = undefined; aplicarModelo(); passo(); });
-  $('#btnCancelar').onclick = () => { sessao = null; passo(); };
+  $('#mAba')?.addEventListener('change', () => { s.aba = ($('#mAba') as HTMLSelectElement).value; s.rows = s.lerAba!(s.aba); aplicarModelo(s); passo(); });
+  ligarCabecalho(el, s);
   $('#btnImp').onclick = async () => {
-    const salvarModelo = ($('#mSalvar') as HTMLInputElement).checked;
-    const imp = await importar(s.conta, conv.linhas, s.arquivo);
-    if (salvarModelo) {
-      const ass = assinatura(rows, m.linhaCab);
-      await mudar(d => {
-        const existente = d.modelos.find(x => x.conta === s.conta && x.assinatura === ass);
-        const md = { ...m, id: existente?.id || uid('m'), conta: s.conta, nome: existente?.nome || `${nomeConta(s.conta)}, ${s.arquivo}`.slice(0, 60), assinatura: ass };
-        return { ...d, modelos: [...d.modelos.filter(x => x.id !== md.id), md] };
-      });
-    }
-    s.resultado = [imp];
-    passo();
+    // Num lote, o modelo é sempre salvo (é ele que faz o app reconhecer o arquivo da próxima vez).
+    const salvar = ($('#mSalvar') as HTMLInputElement | null)?.checked ?? true;
+    s.resultado = [await importar(s.conta, conv.linhas, s.arquivo)];
+    if (salvar) await salvarModelo(s);
+    terminouUm();
   };
+}
+
+/** Guarda o mapeamento como modelo da conta (mesmo cabeçalho = mesmo modelo). */
+async function salvarModelo(s: Sessao) {
+  const m = s.map!, ass = assinatura(s.rows!, m.linhaCab);
+  await mudar(d => {
+    const existente = d.modelos.find(x => x.conta === s.conta && x.assinatura === ass);
+    const md = { ...m, id: existente?.id || uid('m'), conta: s.conta, nome: existente?.nome || `${nomeConta(s.conta)}, ${s.arquivo}`.slice(0, 60), assinatura: ass };
+    return { ...d, modelos: [...d.modelos.filter(x => x.id !== md.id), md] };
+  });
 }
 
 function passoOfx(el: HTMLElement, s: Sessao) {
   const o = s.ofx!;
-  const linhas = o.linhas.map(l => ({ ...l, valor: s.inverter ? -l.valor : l.valor }));
+  const linhas = linhasDe(s);
   el.innerHTML = `<section class="caixa">
-    <h2>${esc(s.arquivo)}</h2>
-    <p class="sub">OFX ${o.cartao ? 'de cartão' : 'de conta'}${o.banco ? `, banco ${esc(o.banco)}` : ''}${o.contaId ? `, conta ${esc(o.contaId)}` : ''}. Confira se a conta escolhida acima é a certa.</p>
+    ${cabecalho(s)}
+    <p class="sub">OFX ${o.cartao ? 'de cartão' : 'de conta'}${o.banco ? `, banco ${esc(o.banco)}` : ''}${o.contaId ? `, conta ${esc(o.contaId)}` : ''}.</p>
     <label class="check"><input type="checkbox" id="oInv"${s.inverter ? ' checked' : ''}> Inverter sinal</label>
     ${previa(linhas)}
-    <div class="row"><button type="button" class="btn primary" id="btnImp">Importar ${linhas.length} linhas em ${esc(nomeConta(s.conta))}</button>
-      <button type="button" class="btn" id="btnCancelar">Cancelar</button></div>
+    <div class="row">${botaoImportar(s, linhas.length)}${botaoCancelar()}</div>
   </section>`;
   $('#oInv').onchange = () => { s.inverter = ($('#oInv') as HTMLInputElement).checked; passo(); };
-  $('#btnCancelar').onclick = () => { sessao = null; passo(); };
-  $('#btnImp').onclick = async () => { s.resultado = [await importar(s.conta, linhas, s.arquivo)]; passo(); };
+  ligarCabecalho(el, s);
+  $('#btnImp').onclick = async () => { s.resultado = [await importar(s.conta, linhas, s.arquivo)]; terminouUm(); };
 }
 
 function passoPdf(el: HTMLElement, s: Sessao) {
   const p = s.pdf!;
-  ($('#iConta') as HTMLSelectElement).value = s.conta;
   el.innerHTML = `<section class="caixa">
-    <h2>${esc(s.arquivo)}</h2>
-    <p class="sub">Extrato em PDF${p.banco ? ` do ${esc(p.banco)}` : ''}. Cada movimento tem número de operação, então importar de novo não duplica. Confira a conta escolhida acima.</p>
+    ${cabecalho(s)}
+    <p class="sub">Extrato em PDF${p.banco ? ` do ${esc(p.banco)}` : ''}. Cada movimento tem número de operação, então importar de novo não duplica.</p>
     ${previa(p.linhas)}
-    <div class="row"><button type="button" class="btn primary" id="btnImp">Importar ${p.linhas.length} linhas em ${esc(nomeConta(s.conta))}</button>
-      <button type="button" class="btn" id="btnCancelar">Cancelar</button></div>
+    <div class="row">${botaoImportar(s, p.linhas.length)}${botaoCancelar()}</div>
   </section>`;
-  $('#btnCancelar').onclick = () => { sessao = null; passo(); };
-  $('#btnImp').onclick = async () => { s.resultado = [await importar(s.conta, p.linhas, s.arquivo)]; passo(); };
+  ligarCabecalho(el, s);
+  $('#btnImp').onclick = async () => { s.resultado = [await importar(s.conta, p.linhas, s.arquivo)]; terminouUm(); };
 }
 
 function passoFinai(el: HTMLElement, s: Sessao) {
   const f = s.finai!;
   const d = state.dados;
   el.innerHTML = `<section class="caixa">
-    <h2>${esc(s.arquivo)}</h2>
-    <div class="sub">Arquivo finai-banco/1 gerado em ${esc(f.geradoEm)}. Escolha em que conta do app entra cada conta do arquivo (a conta escolhida lá em cima não vale aqui).</div>
+    <div class="row between"><h2>${esc(s.arquivo)}</h2>${lote.length > 1 ? '<button type="button" class="btn small" id="btnLista">Voltar à lista</button>' : ''}</div>
+    <div class="sub">Arquivo finai-banco/1 gerado em ${esc(f.geradoEm)}. Escolha em que conta do app entra cada conta do arquivo.</div>
     ${f.avisos.map(a => `<div class="err">${esc(a)}</div>`).join('')}
     <div class="form">${f.contas.map(c => `<div class="field full"><label>${esc(c.banco)}, ${esc(c.nome)} (${(f.porConta.get(c.id) || []).length} transações)</label>
       <select data-dest="${esc(c.id)}">${opcoes([{ v: '', t: `Criar conta nova “${c.nome === c.id ? c.id : c.banco + ' ' + c.nome}”` }, ...d.contas.map(x => ({ v: x.id, t: x.nome }))], s.destino![c.id])}</select></div>`).join('')}</div>
-    <div class="row"><button type="button" class="btn primary" id="btnImp">Importar</button><button type="button" class="btn" id="btnCancelar">Cancelar</button></div>
+    <div class="row"><button type="button" class="btn primary" id="btnImp">Importar</button>${botaoCancelar()}</div>
   </section>`;
   el.querySelectorAll<HTMLSelectElement>('[data-dest]').forEach(x => (x.onchange = () => { s.destino![x.dataset.dest!] = x.value; }));
-  $('#btnCancelar').onclick = () => { sessao = null; passo(); };
-  $('#btnImp').onclick = async () => {
-    const res: Importacao[] = [];
-    for (const c of f.contas) {
-      const l = f.porConta.get(c.id) || [];
-      if (!l.length) continue;
-      let destino = s.destino![c.id];
-      if (!destino) {
-        const nova: Conta = { ...c, id: state.dados.contas.some(x => x.id === c.id) ? uid(c.id + '-') : c.id, nome: c.nome === c.id ? c.id : `${c.banco} ${c.nome}` };
-        await mudar(dd => ({ ...dd, contas: [...dd.contas, nova] }));
-        destino = nova.id;
-      }
-      res.push(await importarLinhasConta(destino, linhasFinai(destino, l), s.arquivo));
+  $('#btnLista')?.addEventListener('click', () => { aberto = -1; passo(); });
+  $('#btnCancelar').onclick = fechar;
+  $('#btnImp').onclick = async () => { s.resultado = await importarFinai(s); terminouUm(); };
+}
+
+async function importarFinai(s: Sessao): Promise<Importacao[]> {
+  const f = s.finai!;
+  const res: Importacao[] = [];
+  for (const c of f.contas) {
+    const l = f.porConta.get(c.id) || [];
+    if (!l.length) continue;
+    let destino = s.destino![c.id];
+    if (!destino) {
+      const nova: Conta = { ...c, id: state.dados.contas.some(x => x.id === c.id) ? uid(c.id + '-') : c.id, nome: c.nome === c.id ? c.id : `${c.banco} ${c.nome}` };
+      await mudar(dd => ({ ...dd, contas: [...dd.contas, nova] }));
+      destino = nova.id;
     }
-    s.resultado = res;
-    passo();
-  };
+    res.push(await importarLinhasConta(destino, linhasFinai(destino, l), s.arquivo));
+  }
+  return res;
 }
 
 async function importarLinhasConta(conta: string, linhas: ReturnType<typeof chavesDasLinhas>, arquivo: string): Promise<Importacao> {
@@ -285,8 +450,17 @@ async function importar(conta: string, l: LinhaBruta[], arquivo: string) {
   return imp;
 }
 
-function painelResultado(rs: Importacao[]) {
-  const t = rs.reduce((a, i) => ({ novas: a.novas + i.novas, unidas: a.unidas + i.unidas, revisao: a.revisao + i.revisao, repetidas: a.repetidas + i.repetidas }), { novas: 0, unidas: 0, revisao: 0, repetidas: 0 });
+const somar = (rs: Importacao[]) => rs.reduce((a, i) => ({ novas: a.novas + i.novas, unidas: a.unidas + i.unidas, revisao: a.revisao + i.revisao, repetidas: a.repetidas + i.repetidas }), { novas: 0, unidas: 0, revisao: 0, repetidas: 0 });
+
+function resumoImp(rs: Importacao[]) {
+  const t = somar(rs);
+  const n = (q: number, um: string, varios: string) => `${q} ${q === 1 ? um : varios}`;
+  return [n(t.novas, 'nova', 'novas'), n(t.unidas, 'unida', 'unidas'), t.revisao ? `${t.revisao} em revisão` : '', t.repetidas ? n(t.repetidas, 'repetida', 'repetidas') : ''].filter(Boolean).join(', ');
+}
+
+function painelResultado(ss: Sessao[]) {
+  const rs = ss.flatMap(s => s.resultado || []);
+  const t = somar(rs);
   return `<section class="caixa">
     <h2>Importado</h2>
     <div class="stats">
@@ -294,13 +468,14 @@ function painelResultado(rs: Importacao[]) {
       <div><span class="label">Unidas</span><b class="lg">${t.unidas}</b></div>
       <div><span class="label">Revisão</span><b class="lg ${t.revisao ? 'warn' : ''}">${t.revisao}</b></div>
     </div>
+    ${ss.length > 1 ? `<div class="list">${ss.map(s => `<div class="item"><div class="name">${esc(s.arquivo)}</div><div class="val sub">${esc((s.resultado || []).map(r => nomeConta(r.conta)).join(', '))}</div>
+      <div class="meta">${resumoImp(s.resultado || [])}</div></div>`).join('')}</div>` : ''}
     <div class="sub">${t.repetidas ? `${t.repetidas} linhas já tinham sido importadas antes e foram puladas. ` : ''}“Unidas” são linhas que já existiam por notificação ou lançamento manual: o extrato prevaleceu e a origem ficou registrada.</div>
     <div class="row">${t.revisao ? '<button type="button" class="btn primary" data-ir="revisao">Revisar agora</button>' : ''}
       <button type="button" class="btn" data-ir="conferencia?conta=${encodeURIComponent(rs[0]?.conta || '')}&mes=${(rs[0]?.ate || hoje()).slice(0, 7)}">Conferência</button>
-      <button type="button" class="btn" id="btnNovoArq">Importar outro</button></div>
+      <button type="button" class="btn" id="btnNovoArq">Importar outros</button></div>
   </section>`;
 }
-
 
 // ---------- Revisão ----------
 
