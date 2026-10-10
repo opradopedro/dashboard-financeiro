@@ -119,7 +119,10 @@ resultado de cada um. Com um arquivo só, ele abre direto para conferir.
 de fatura”, “Caixinha”…). Toque para marcar linhas (ou **Marcar todas**) e use **Categoria**,
 **Tipo**, **Inverter sinal** ou **Não importar** (linha tirada não volta ao reimportar o arquivo).
 Em **Já importados**, toque num arquivo para ver as transações que vieram dele e fazer o mesmo
-com elas depois (inclusive excluir).
+com elas depois (inclusive excluir). **Toque e segure** para marcar um ou mais arquivos e
+**Remover**; há também **Remover tudo** e, na tela do arquivo, **Remover esta importação**.
+Remover desfaz a importação: transações que vieram só do arquivo saem; as que já existiam por
+notificação ou à mão continuam, com os dados de antes do extrato; dá para importar de novo depois.
 
 Formatos conferidos com arquivos reais:
 

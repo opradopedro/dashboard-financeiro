@@ -290,3 +290,8 @@ dialog.folha-sel::backdrop{background:rgba(6,9,15,.62)}
 /* Listas: o toque é tratado pelo app (folha que sobe de baixo), nunca pela lista do Android. */
 select:not([multiple]){pointer-events:none}
 .field:has(> select){cursor:pointer}
+.item.imp{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.item.imp.marcada{background:linear-gradient(90deg,rgba(217,200,164,.1),transparent)}
+.imp-check{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--grafite);
+  vertical-align:-4px;margin-right:10px;color:var(--noite)}
+.marcada .imp-check{background:var(--champanhe);border-color:var(--champanhe)}

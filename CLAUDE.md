@@ -117,7 +117,8 @@ Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INI
 ### Extratos e deduplicação (`juntar.ts`)
 - Pré-visualização: `Edicoes` por índice da linha (excluir/inverter/cat/tipo); `aplicarEdicoes` mantém a
   chave da linha original e manda as tiradas para `excluidas`. `txsDaImportacao` acha as transações de
-  um arquivo (origem extrato com mesmo `em` e arquivo). Em cartão, o sinal é orientado sozinho
+  um arquivo (origem extrato com mesmo `em` e arquivo). `desfazerImportacoes` remove importações
+  (txs só delas saem; unidas voltam à primeira origem restante; sem marcar excluídas). Em cartão, o sinal é orientado sozinho
   (maioria positiva = trocado), mesmo com modelo salvo.
 - Importação aceita vários arquivos: `detectarFonte` (modelo salvo > cabeçalho/PDF/OFX > nome do
   arquivo) e `contaDaFonte` (mesmo banco e tipo) escolhem a conta; em lote o modelo é sempre salvo.

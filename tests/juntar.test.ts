@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chavesDasLinhas, conferencia, importarLinhas, resolverRevisao, type EstadoJuntar, aplicarEdicoes, txsDaImportacao } from '../src/core/juntar';
+import { chavesDasLinhas, conferencia, importarLinhas, resolverRevisao, type EstadoJuntar, aplicarEdicoes, txsDaImportacao, desfazerImportacoes } from '../src/core/juntar';
 import type { Transacao } from '../src/core/tipos';
 
 const tx = (id: string, conta: string, data: string, valor: number, tipo: 'notificacao' | 'manual' = 'notificacao', desc = 'NOTIF'): Transacao =>
@@ -108,5 +108,31 @@ describe('edições da pré-visualização', () => {
     const b = importarLinhas({ ...a, excluidas: r.excluidas }, chavesDasLinhas('nu', brutas), 'fatura.csv');
     expect(b.importacao).toMatchObject({ novas: 0, repetidas: 3 });
     expect(txsDaImportacao(b.txs, b.importacao)).toEqual([]);
+  });
+});
+
+describe('desfazer importação', () => {
+  it('tira o que veio só do arquivo, devolve a notificação ao que era e permite importar de novo', () => {
+    const notif: Transacao = { id: 'n1', conta: 'c', data: '2026-09-01', desc: 'Compra Padaria', valor: -10, origens: [{ tipo: 'notificacao', ref: 'x', em: '', data: '2026-09-01', desc: 'Compra Padaria', valor: -10 }], criadoEm: '' };
+    const ls = chavesDasLinhas('c', [{ data: '2026-09-01', desc: 'PADARIA LTDA', valor: -10 }, { data: '2026-09-03', desc: 'Mercado', valor: -50 }]);
+    const a = importarLinhas({ txs: [notif], revisoes: [], excluidas: [] }, ls, 'f.csv', '2026-10-10T00:00:00Z');
+    expect(a.importacao).toMatchObject({ novas: 1, unidas: 1 });
+    const est = { ...a, importacoes: [a.importacao] };
+    const d = desfazerImportacoes(est, [a.importacao.id]);
+    expect(d).toMatchObject({ removidas: 1, restauradas: 1, importacoes: [] });
+    expect(d.txs).toHaveLength(1);
+    expect(d.txs[0]).toMatchObject({ id: 'n1', desc: 'Compra Padaria', origens: [{ tipo: 'notificacao' }] });
+    // Importar o mesmo arquivo de novo funciona (nada ficou como excluído).
+    const b = importarLinhas(d, ls, 'f.csv');
+    expect(b.importacao).toMatchObject({ novas: 1, unidas: 1, repetidas: 0 });
+  });
+  it('outras importações e revisões de outros arquivos ficam', () => {
+    const l1 = chavesDasLinhas('c', [{ data: '2026-09-01', desc: 'A', valor: -1 }]);
+    const l2 = chavesDasLinhas('c', [{ data: '2026-09-02', desc: 'B', valor: -2 }]);
+    const a = importarLinhas({ txs: [], revisoes: [], excluidas: [] }, l1, '1.csv', '2026-10-10T00:00:00Z');
+    const b = importarLinhas(a, l2, '2.csv', '2026-10-10T00:00:01Z');
+    const d = desfazerImportacoes({ ...b, importacoes: [a.importacao, b.importacao] }, [a.importacao.id]);
+    expect(d.txs.map(t => t.desc)).toEqual(['B']);
+    expect(d.importacoes.map(i => i.arquivo)).toEqual(['2.csv']);
   });
 });

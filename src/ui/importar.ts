@@ -1,7 +1,7 @@
 // Importação de extratos (PDF, CSV, Excel, OFX e finai-banco/1), um ou vários arquivos de uma vez,
 // com a instituição reconhecida pelo formato; revisão de casos duvidosos e conferência mensal.
 import { classificadas, classificarAvulsas, editarTxs, excluirTxs, mudar, nomeConta, state } from '../app';
-import { aplicarEdicoes, chavesDasLinhas, conferencia, edicoesVazias, importarLinhas, resolverRevisao, saldoMaisRecente, txsDaImportacao, type Edicoes, type LinhaBruta } from '../core/juntar';
+import { aplicarEdicoes, chavesDasLinhas, conferencia, desfazerImportacoes, edicoesVazias, importarLinhas, resolverRevisao, saldoMaisRecente, txsDaImportacao, type Edicoes, type LinhaBruta } from '../core/juntar';
 import { itensPdf, lerExtratoPdf, type ExtratoPdf } from '../importar/pdf';
 import { lerFinai, linhasFinai, type LidoFinai } from '../core/finai';
 import type { Conta, Importacao, Mapeamento, LinhaExtrato, Transacao } from '../core/tipos';
@@ -17,7 +17,7 @@ import { $, brl, esc, fmtD, fmtQuando, mesLongo, opcoes, sinal, toast } from './
 import { confirmar } from './escolher';
 import { editorLinhas, resumoLinhas, type LinhaVis } from './linhas';
 import { linhaTx } from './transacoes';
-import { trocar, type Rota } from './nav';
+import { trocar, voltar, type Rota } from './nav';
 
 interface Sessao {
   arquivo: string;
@@ -58,10 +58,7 @@ export function telaImportar(el: HTMLElement) {
       <button type="button" class="btn" data-ir="conferencia">Conferir mês</button></div>
   </section>
   <div id="iPasso"></div>
-  <section class="panel"><h2>Já importados</h2><p class="note">Toque num arquivo para ver as linhas e mudar várias de uma vez.</p><div class="folha"><div class="list">${[...d.importacoes].reverse().slice(0, 30).map(i => `<button type="button" class="item" data-ir="importacao/${esc(i.id)}">
-    <div class="name">${esc(i.arquivo)}</div><div class="val sub">${fmtQuando(Date.parse(i.em))}</div>
-    <div class="meta">${esc(nomeConta(i.conta))}, de ${fmtD(i.de)} a ${fmtD(i.ate)}</div>
-    <div class="meta r">${resumoImp([i])}</div></button>`).join('') || '<div class="empty">Nenhum arquivo importado ainda.</div>'}</div></div></section>`;
+  <section class="panel" id="iJa"></section>`;
 
   ($('#iArq') as HTMLInputElement).onchange = async e => {
     const inp = e.target as HTMLInputElement;
@@ -83,6 +80,89 @@ export function telaImportar(el: HTMLElement) {
     passo();
   };
   passo();
+  desenharImportados();
+}
+
+// ---------- Já importados: toque abre; toque longo marca vários para remover ----------
+
+let marcadas: Set<string> | null = null; // null = fora do modo de seleção
+let ignorarClique = false;
+
+const ICONE_MARCA = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+
+function desenharImportados() {
+  const el = document.getElementById('iJa');
+  if (!el) return;
+  const imps = [...state.dados.importacoes].reverse();
+  const sel = marcadas;
+  if (sel) for (const id of [...sel]) if (!imps.some(i => i.id === id)) sel.delete(id);
+  const todas = !!sel && sel.size === imps.length && imps.length > 0;
+  el.innerHTML = `<div class="row between"><h2>Já importados</h2>${imps.length && !sel ? '<button type="button" class="btn small danger" id="btnRemTudo">Remover tudo</button>' : ''}</div>
+    ${sel ? `<div class="sel-barra">
+        <div class="row between nowrap"><span class="sub">${sel.size ? `${sel.size === 1 ? '1 marcado' : `${sel.size} marcados`}` : 'Toque nos arquivos para marcar'}</span>
+          <button type="button" class="btn small" id="impTodos">${todas ? 'Desmarcar todos' : 'Marcar todos'}</button></div>
+        <div class="sel-acoes"><button type="button" class="btn small danger" id="impRemover"${sel.size ? '' : ' disabled'}>Remover</button>
+          <button type="button" class="btn small" id="impCancelar">Cancelar</button></div>
+      </div>`
+      : imps.length ? '<p class="note">Toque num arquivo para ver as linhas. Toque e segure para marcar um ou mais e remover.</p>' : ''}
+    <div class="folha"><div class="list">${imps.map(i => `<button type="button" class="item imp${sel?.has(i.id) ? ' marcada' : ''}" data-imp="${esc(i.id)}"${sel ? ` aria-pressed="${sel.has(i.id)}"` : ''}>
+      <div class="name">${sel ? `<span class="imp-check">${sel.has(i.id) ? ICONE_MARCA : ''}</span>` : ''}${esc(i.arquivo)}</div><div class="val sub">${fmtQuando(Date.parse(i.em))}</div>
+      <div class="meta">${esc(nomeConta(i.conta))}, de ${fmtD(i.de)} a ${fmtD(i.ate)}</div>
+      <div class="meta r">${resumoImp([i])}</div></button>`).join('') || '<div class="empty">Nenhum arquivo importado ainda.</div>'}</div></div>`;
+
+  el.querySelectorAll<HTMLButtonElement>('[data-imp]').forEach(b => {
+    const id = b.dataset.imp!;
+    let timer = 0, x0 = 0, y0 = 0;
+    const parar = () => { clearTimeout(timer); timer = 0; };
+    b.addEventListener('pointerdown', e => {
+      x0 = e.clientX; y0 = e.clientY;
+      parar();
+      timer = window.setTimeout(() => {
+        timer = 0;
+        ignorarClique = true;
+        if (!marcadas) marcadas = new Set();
+        marcadas.add(id);
+        desenharImportados();
+      }, 450);
+    });
+    b.addEventListener('pointermove', e => { if (timer && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) parar(); });
+    b.addEventListener('pointerup', parar);
+    b.addEventListener('pointercancel', parar);
+    b.addEventListener('pointerleave', parar);
+    b.addEventListener('contextmenu', e => e.preventDefault());
+    b.onclick = () => {
+      if (ignorarClique) { ignorarClique = false; return; }
+      if (!marcadas) { location.hash = '#/importacao/' + encodeURIComponent(id); return; }
+      if (marcadas.has(id)) marcadas.delete(id); else marcadas.add(id);
+      desenharImportados();
+    };
+  });
+  // O toque longo pode terminar fora do item: o clique seguinte já não é dele.
+  el.addEventListener('pointerdown', () => { ignorarClique = false; }, { capture: true, once: true });
+  $('#impTodos')?.addEventListener('click', () => { marcadas = todas ? new Set() : new Set(imps.map(i => i.id)); desenharImportados(); });
+  $('#impCancelar')?.addEventListener('click', () => { marcadas = null; desenharImportados(); });
+  $('#impRemover')?.addEventListener('click', () => void removerImportacoes([...(marcadas || [])]));
+  $('#btnRemTudo')?.addEventListener('click', () => void removerImportacoes(imps.map(i => i.id), true));
+}
+
+/** Desfaz as importações escolhidas, depois de confirmar. Devolve true se removeu. */
+async function removerImportacoes(ids: string[], tudo = false): Promise<boolean> {
+  if (!ids.length) return false;
+  const prev = desfazerImportacoes(state.dados, ids);
+  const n = ids.length === 1 ? 'esta importação' : `${ids.length} importações`;
+  const partes = [
+    prev.removidas ? `${prev.removidas === 1 ? '1 transação que veio só do arquivo sai' : `${prev.removidas} transações que vieram só ${ids.length === 1 ? 'do arquivo' : 'dos arquivos'} saem`} do app.` : '',
+    prev.restauradas ? `${prev.restauradas === 1 ? '1 transação que já existia' : `${prev.restauradas} transações que já existiam`} (por notificação ou à mão) ${prev.restauradas === 1 ? 'continua' : 'continuam'}, como ${prev.restauradas === 1 ? 'era' : 'eram'} antes do extrato.` : '',
+    'Dá para importar de novo depois.',
+  ].filter(Boolean).join(' ');
+  const ok = await confirmar(tudo ? 'Remover todas as importações?' : `Remover ${n}?`, partes, { sim: 'Remover', nao: 'Cancelar' });
+  if (!ok) return false;
+  await mudar(d => { const { removidas: _r, restauradas: _s, ...resto } = desfazerImportacoes(d, ids); return resto; });
+  marcadas = null;
+  selImp = { id: '', sel: new Set() };
+  toast(ids.length === 1 ? 'Importação removida.' : `${ids.length} importações removidas.`);
+  desenharImportados();
+  return true;
 }
 
 /** Lê o arquivo, reconhece a instituição e escolhe a conta. Erros ficam na sessão. */
@@ -592,6 +672,7 @@ export function telaImportacao(el: HTMLElement, id: string) {
       ${trocado ? `<div class="aviso-bloco"><p>As compras deste cartão estão positivas, como entrada: o sinal do arquivo parece trocado.</p>
         <button type="button" class="btn small primary" id="btnInvTudo">Inverter o sinal de todas</button></div>` : ''}
       ${revs.length ? `<button type="button" class="aviso" data-ir="revisao">${revs.length === 1 ? '1 linha deste arquivo espera' : `${revs.length} linhas deste arquivo esperam`} revisão</button>` : ''}
+      <div class="row"><button type="button" class="btn small danger" id="btnRemImp">Remover esta importação</button></div>
     </section>
     <section class="panel">
       <p class="sub">${minhas.length ? resumoLinhas(vis) : 'Nenhuma transação deste arquivo continua no app (todas repetidas, em revisão ou excluídas).'}</p>
@@ -603,6 +684,7 @@ export function telaImportacao(el: HTMLElement, id: string) {
     inverter: async sel => { await editarTxs(sel, t => ({ ...t, valor: -t.valor })); toast('Sinal invertido.'); },
     excluir: async sel => { await excluirTxs(sel); toast(sel.length === 1 ? 'Excluída. Reimportar o arquivo não a traz de volta.' : 'Excluídas. Reimportar o arquivo não as traz de volta.'); },
   });
+  el.querySelector('#btnRemImp')?.addEventListener('click', async () => { if (await removerImportacoes([id])) voltar(); });
   el.querySelector('#btnInvTudo')?.addEventListener('click', async () => {
     await editarTxs([...ids], t => ({ ...t, valor: -t.valor }));
     toast('Sinal invertido em todas.');

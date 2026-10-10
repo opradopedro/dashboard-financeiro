@@ -178,3 +178,29 @@ export function conferencia(txs: Transacao[], revisoes: Revisao[], importacoes: 
   }
   return out;
 }
+
+/**
+ * Desfaz importações: transações que vieram só delas saem; as que já existiam (notificação ou
+ * manual) perdem a origem de extrato e voltam aos dados de antes; revisões delas somem. As linhas
+ * não ficam como excluídas: dá para importar os arquivos de novo.
+ */
+export function desfazerImportacoes<T extends EstadoJuntar & { importacoes: Importacao[] }>(est: T, ids: string[]): T & { removidas: number; restauradas: number } {
+  const imps = est.importacoes.filter(i => ids.includes(i.id));
+  const daqui = (o: Origem) => o.tipo === 'extrato' && imps.some(i => i.em === o.em && i.arquivo === o.arquivo);
+  let removidas = 0, restauradas = 0;
+  const txs: Transacao[] = [];
+  for (const t of est.txs) {
+    if (!t.origens.some(daqui)) { txs.push(t); continue; }
+    const resto = t.origens.filter(o => !daqui(o));
+    if (!resto.length) { removidas++; continue; }
+    // Volta aos dados de como chegou antes do extrato (a primeira origem que sobrou).
+    const o = resto[0];
+    txs.push({ ...t, data: o.data, desc: o.desc, valor: o.valor, origens: resto });
+    restauradas++;
+  }
+  const fora = new Set(txs.map(t => t.id));
+  const revisoes = est.revisoes
+    .filter(r => !imps.some(i => i.em === r.em && i.arquivo === r.arquivo))
+    .map(r => ({ ...r, candidatos: r.candidatos.filter(c => fora.has(c)) }));
+  return { ...est, txs, revisoes, importacoes: est.importacoes.filter(i => !ids.includes(i.id)), removidas, restauradas };
+}
