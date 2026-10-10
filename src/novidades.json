@@ -1,5 +1,6 @@
 {
   "proxima": [
+    "Aviso de repetido: antes de importar um arquivo que já foi importado (ou linhas iguais às de outro extrato), lançar uma entrada ou saída igual a uma que já existe, ou criar regra ou conta igual, o app pergunta “Já existe … exatamente como essa. Deseja continuar?”.",
     "Arquivos já importados: toque para ver as linhas; marque algumas (ou todas) e mude categoria ou tipo, inverta o sinal ou exclua de uma vez.",
     "Na importação, a lista de linhas tem as mesmas ações antes de importar, mostra como cada linha vai entrar (ex.: pagamento de fatura) e o resumo não soma pagamento de fatura como entrada.",
     "Fatura de cartão com o sinal trocado (compras positivas, como na Rico) é acertada sozinha, mesmo com modelo salvo; arquivo já importado assim mostra um botão para inverter tudo.",

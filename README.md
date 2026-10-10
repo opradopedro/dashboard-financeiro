@@ -145,6 +145,19 @@ do movimento mais recente.
 - **Conferência mensal** (por conta): o que bateu, o que só está no extrato e o que só veio por
   notificação/manual.
 
+### Avisos de repetido
+Antes de gravar, o app pergunta se você quer continuar quando:
+- o **arquivo já foi importado** (mesma conta, mesmo período, todas as linhas conhecidas: “Já
+  existe uma importação exatamente como essa…”), ou parte das linhas já entrou (vão ser puladas);
+- linhas novas são **iguais (conta, data e valor) a transações de outro extrato** (ex.: o mesmo mês em
+  PDF e depois em CSV), que ficariam duplicadas;
+- você **lança uma entrada/saída igual** (mesma conta, data, valor e descrição) ou parecida (mesma
+  conta e valor, até 1 dia) a uma que já existe;
+- cria uma **regra** igual (mesmo app e padrão), uma **regra de categoria** com o mesmo trecho
+  (substitui) ou uma **conta** com o mesmo nome. Categoria com o mesmo nome não é criada.
+
+Na lista de arquivos, o aviso já aparece em cada arquivo repetido.
+
 ### Fatura do cartão
 Pagamento de fatura não é gasto nem entrada: cada compra já contou no dia em que foi feita. O
 pagamento que aparece no cartão (“Pagamento recebido”, “Pagamento de fatura”) é ligado ao Pix ou

@@ -5,7 +5,7 @@ import { aplicarRegra, sentidoPadrao, sugerirPadrao } from '../core/regras';
 import { ACOES, ORIGENS_REGRA, TIPOS, type AcaoRegra, type OrigemRegra, type RegraNotif, type TipoTx } from '../core/tipos';
 import { norm, uid } from '../core/util';
 import { $, esc, fmtD, opcoes, sinal, toast } from './fmt';
-import { campoCategoria, ligarCampoCategoria, valorCampo } from './escolher';
+import { campoCategoria, confirmar, ligarCampoCategoria, valorCampo } from './escolher';
 import { trocar, voltar, type Rota } from './nav';
 
 const ORDENS: [string, string][] = [['app', 'Por app'], ['recentes', 'Mais recentes'], ['antigas', 'Mais antigas']];
@@ -69,6 +69,8 @@ export function telaRegras(el: HTMLElement, r: Rota) {
     const tipoSel = ($('#rcTipo') as HTMLSelectElement).value as TipoTx | '';
     const cat = valorCampo('rcCat');
     if (!termo || (!tipoSel && !cat)) { toast('Escreva o trecho e escolha o tipo ou a categoria.'); return; }
+    const igual = state.dados.regrasCat.find(x => x.termo === termo);
+    if (igual && !(await confirmar('Regra repetida', `Já existe uma regra para “${termo}”${igual.cat ? ` (categoria ${igual.cat})` : ''}${igual.tipo ? ` (tipo ${TIPOS[igual.tipo].toLowerCase()})` : ''}. A nova substitui a antiga. Deseja continuar?`, { sim: 'Substituir' }))) return;
     await mudar(dd => ({ ...dd, regrasCat: [...dd.regrasCat.filter(x => x.termo !== termo), { id: uid('rc'), termo, ...(tipoSel ? { tipo: tipoSel } : {}), ...(cat ? { cat } : {}) }] }));
     toast(`Regra criada para “${termo}”.`);
     dispatchEvent(new Event('rerender'));
@@ -163,6 +165,8 @@ export function telaRegra(el: HTMLElement, id: string, r: Rota) {
     const rg = ler();
     try { new RegExp(rg.padrao, 'i'); } catch (err) { toast('Expressão inválida: ' + (err as Error).message); return; }
     if (rg.acao !== 'ignorar' && !/\(\?<valor>/.test(rg.padrao)) { toast('Falta o grupo (?<valor>…) no padrão.'); return; }
+    const igual = state.dados.regras.find(x => x.id !== rg.id && x.pacote === rg.pacote && x.padrao.trim() === rg.padrao.trim());
+    if (igual && !(await confirmar('Regra repetida', `Já existe uma regra exatamente como essa para este app: “${igual.nome}”${igual.ativa ? '' : ' (desligada)'}. Deseja continuar?`, { sim: 'Salvar mesmo assim' }))) return;
     await mudar(dd => ({ ...dd, regras: dd.regras.some(x => x.id === rg.id) ? dd.regras.map(x => (x.id === rg.id ? rg : x)) : [...dd.regras, rg] }));
     if (!state.dados.apps.some(a => a.pacote === rg.pacote)) {
       await mudar(dd => ({ ...dd, apps: [...dd.apps, { pacote: rg.pacote, nome: rg.pacote, ativo: true }] }));

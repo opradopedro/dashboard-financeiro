@@ -132,3 +132,30 @@ export function escolherOpcao(titulo: string, opcoes: { v: string; t: string; no
     dlg.showModal();
   });
 }
+
+/**
+ * Pergunta antes de seguir (ex.: algo repetido). `detalhes` vira uma lista abaixo do texto.
+ * Devolve true se a pessoa escolheu continuar.
+ */
+export function confirmar(titulo: string, texto: string, op: { detalhes?: string[]; sim?: string; nao?: string } = {}): Promise<boolean> {
+  return new Promise(resolve => {
+    let ok = false;
+    const dlg = document.createElement('dialog');
+    dlg.className = 'folha-sel folha-confirma';
+    dlg.setAttribute('aria-label', titulo);
+    dlg.innerHTML = `<div class="confirma-corpo">
+        <h2>${esc(titulo)}</h2>
+        <p>${esc(texto)}</p>
+        ${op.detalhes?.length ? `<ul class="confirma-lista">${op.detalhes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+        <div class="row"><button type="button" class="btn primary" id="cfSim">${esc(op.sim || 'Continuar')}</button>
+          <button type="button" class="btn" id="cfNao">${esc(op.nao || 'Cancelar')}</button></div>
+      </div>`;
+    document.body.appendChild(dlg);
+    (dlg.querySelector('#cfSim') as HTMLButtonElement).onclick = () => { ok = true; dlg.close(); };
+    (dlg.querySelector('#cfNao') as HTMLButtonElement).onclick = () => dlg.close();
+    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+    dlg.addEventListener('close', () => { dlg.remove(); resolve(ok); });
+    dlg.showModal();
+    (dlg.querySelector('#cfNao') as HTMLButtonElement).focus();
+  });
+}

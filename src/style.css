@@ -264,7 +264,7 @@ dialog.folha-sel::backdrop{background:rgba(6,9,15,.62)}
 /* ---------- linhas com seleção (importação) ---------- */
 .sel-barra{position:sticky;top:calc(62px + var(--sat));z-index:5;background:var(--lousa-alta);border-radius:var(--raio-p);padding:10px 12px;
   display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 18px rgba(6,9,15,.35)}
-.sel-barra .check{align-items:center;font-weight:550}
+.sel-barra .check{align-items:center;font-weight:550;white-space:nowrap}
 .sel-acoes{display:flex;gap:8px;flex-wrap:wrap}
 .sel-acoes::-webkit-scrollbar{display:none}
 .sel-acoes .btn{flex:none}
@@ -280,3 +280,10 @@ dialog.folha-sel::backdrop{background:rgba(6,9,15,.62)}
 .le-val{font-weight:500;white-space:nowrap;font-size:14.5px}
 .linha-ed.fora .le-val{color:var(--grafite)}
 .aviso-bloco{background:var(--alerta-fundo);border-radius:var(--raio-p);padding:12px 14px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5}
+.confirma-corpo{padding:22px 18px 18px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.confirma-corpo p{font-size:15px;line-height:1.55;color:var(--grafite-claro)}
+.confirma-lista{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:var(--papel)}
+.confirma-lista li::marker{color:var(--alerta)}
+.confirma-corpo .row{margin-top:6px}
+.repetido{display:flex;gap:9px;font-size:13px;line-height:1.5;color:var(--grafite-claro)}
+.repetido::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--alerta);flex:none;margin-top:7px}

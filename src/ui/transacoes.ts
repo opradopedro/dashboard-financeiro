@@ -4,7 +4,8 @@ import { SEM_CATEGORIA, type Classificada } from '../core/classificar';
 import { ORIGENS, TIPOS, type TipoTx, type Transacao } from '../core/tipos';
 import { arred, hoje, norm, parseValor, termoDe, uid } from '../core/util';
 import { $, esc, fmtD, fmtQuando, opcoes, sinal, toast } from './fmt';
-import { campoCategoria, ligarCampoCategoria, valorCampo } from './escolher';
+import { campoCategoria, confirmar, ligarCampoCategoria, valorCampo } from './escolher';
+import { transacaoIgual } from '../core/duplicadas';
 import { itemTx, listaPorDia, mesAtual, navMes } from './painel';
 import type { Rota } from './nav';
 import { trocar, voltar } from './nav';
@@ -109,6 +110,17 @@ export function telaTx(el: HTMLElement, id: string) {
     else {
       if (tipoSel !== x!.t) t.tipoUsuario = tipoSel;
       if (catSel !== x!.c) { if (catSel) t.cat = catSel; else { delete t.cat; } }
+    }
+    // Igual a uma que já existe? (lançada à mão de novo, ou já veio por notificação/extrato)
+    const igual = transacaoIgual(state.dados.txs, t);
+    if (igual && (nova || igual.exata)) {
+      const o = igual.tx, nome = tipoSel === 'entrada' ? 'uma entrada' : tipoSel === 'saida' ? 'uma saída' : 'uma transação';
+      const desc = `${o.desc}, ${sinal(o.valor)} em ${fmtD(o.data)}, ${nomeConta(o.conta)}`;
+      const ok = await confirmar(igual.exata ? 'Transação repetida' : 'Transação parecida',
+        igual.exata ? `Já existe ${nome} exatamente como essa: ${desc}. Deseja continuar?`
+          : `Já existe ${nome} com a mesma conta e o mesmo valor${o.data === t.data ? ' no mesmo dia' : ' um dia antes ou depois'}: ${desc}. Pode ser a mesma (ex.: veio por notificação). Deseja continuar?`,
+        { sim: nova ? 'Lançar mesmo assim' : 'Salvar mesmo assim' });
+      if (!ok) return;
     }
     const parecidas = ($('#tParecidas') as HTMLInputElement | null)?.checked;
     const termo = norm(($('#tTermo') as HTMLInputElement | null)?.value || '').trim();

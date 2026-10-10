@@ -5,9 +5,10 @@ import { lerBackup, montarBackup } from '../core/backup';
 import { exportarFinai } from '../core/finai';
 import { dadosIniciais } from '../core/padroes';
 import { MODOS_AVISOS, type Conta, type ModoAvisos, type TipoConta } from '../core/tipos';
-import { arred, hoje, parseValor, slug } from '../core/util';
+import { arred, hoje, norm, parseValor, slug } from '../core/util';
 import { nativo, type EstadoNativo } from '../nativo/notificacoes';
 import { $, esc, opcoes, toast } from './fmt';
+import { confirmar } from './escolher';
 import { aba, voltar } from './nav';
 
 const ok = (b: boolean, sim: string, nao: string) => `<span class="${b ? 'ok' : 'err'}">${b ? '✓ ' + sim : '✗ ' + nao}</span>`;
@@ -208,6 +209,8 @@ export function telaConta(el: HTMLElement, id: string) {
     const v = (s: string) => ($(s) as HTMLInputElement).value.trim();
     const saldo = v('#cSaldo') ? parseValor(v('#cSaldo')) : NaN;
     if (v('#cSaldo') && !Number.isFinite(saldo)) { toast('Saldo inválido.'); return; }
+    const igual = d.contas.find(x => x.id !== c.id && norm(x.nome).trim() === norm(v('#cNome')).trim());
+    if (igual && !(await confirmar('Conta repetida', `Já existe uma conta exatamente como essa: ${igual.nome} (${igual.tipo === 'cartao' ? 'cartão' : 'conta'} ${igual.banco})${igual.ativa ? '' : ', desativada'}. Deseja continuar?`, { sim: 'Salvar mesmo assim' }))) return;
     let novoId = c.id;
     if (nova) { const base = slug(`${v('#cBanco')}-${v('#cTipo') === 'cartao' ? 'cartao' : 'conta'}`); novoId = base; let i = 2; while (d.contas.some(x => x.id === novoId)) novoId = `${base}-${i++}`; }
     const conta: Conta = { id: novoId, nome: v('#cNome'), banco: v('#cBanco'), tipo: v('#cTipo') as TipoConta, ativa: ($('#cAtiva') as HTMLInputElement).checked,
@@ -268,7 +271,9 @@ export function telaCategorias(el: HTMLElement) {
   $('#fCat').onsubmit = async e => {
     e.preventDefault();
     const nome = ($('#ncNome') as HTMLInputElement).value.trim();
-    if (!nome || d.categorias.some(x => x.nome === nome)) { toast('Nome vazio ou repetido.'); return; }
+    if (!nome) { toast('Escreva o nome.'); return; }
+    const igual = d.categorias.find(x => norm(x.nome).trim() === norm(nome).trim());
+    if (igual) { toast(`Já existe a categoria “${igual.nome}”.`); return; }
     const cats = lerPalavras();
     await mudar(dd => ({ ...dd, categorias: [...cats, { nome, receita: ($('#ncTipo') as HTMLSelectElement).value === 'r', palavras: [] }] }));
     dispatchEvent(new Event('rerender'));

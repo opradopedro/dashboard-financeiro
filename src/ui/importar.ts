@@ -7,12 +7,14 @@ import { lerFinai, linhasFinai, type LidoFinai } from '../core/finai';
 import type { Conta, Importacao, Mapeamento, LinhaExtrato, Transacao } from '../core/tipos';
 import { hoje, slug, somaMes, uid } from '../core/util';
 import { lerCsv } from '../importar/csv';
+import { checarImportacao, temAviso, type AvisoImportacao } from '../core/duplicadas';
 import { contaDaFonte, detectarFonte, type ArquivoLido, type Fonte } from '../importar/detectar';
 import { aplicarMapeamento, assinatura, modeloPara, sugerirMapeamento } from '../importar/mapear';
 import { lerOfx, type Ofx } from '../importar/ofx';
 import { lerPlanilha, type Celula } from '../importar/planilha';
 import { decodificar } from '../importar/texto';
 import { $, brl, esc, fmtD, fmtQuando, mesLongo, opcoes, sinal, toast } from './fmt';
+import { confirmar } from './escolher';
 import { editorLinhas, resumoLinhas, type LinhaVis } from './linhas';
 import { linhaTx } from './transacoes';
 import { trocar, type Rota } from './nav';
@@ -154,6 +156,43 @@ function linhasDe(s: Sessao): LinhaBruta[] {
 
 const pronta = (s: Sessao) => !s.erro && !s.resultado && (s.tipo === 'finai' || (!!s.conta && linhasDe(s).length > 0));
 
+// ---------- Repetidos ----------
+
+/** Linhas do arquivo como vão ser gravadas, para conferir se já existem. */
+function linhasParaChecar(s: Sessao): LinhaExtrato[] {
+  if (s.tipo === 'finai') {
+    const f = s.finai!;
+    return f.contas.flatMap(c => (s.destino![c.id] ? linhasFinai(s.destino![c.id], f.porConta.get(c.id) || []) : []));
+  }
+  return s.conta ? aplicarEdicoes(chavesDasLinhas(s.conta, linhasDe(s)), s.ed).linhas : [];
+}
+
+const avisoDe = (s: Sessao): AvisoImportacao => checarImportacao(state.dados, linhasParaChecar(s), s.arquivo);
+const todasRepetidas = (a: AvisoImportacao) => a.total > 0 && a.conhecidas === a.total;
+
+function textoAviso(a: AvisoImportacao) {
+  const partes: string[] = [];
+  if (todasRepetidas(a)) {
+    const m = a.mesma;
+    partes.push(m ? `Já existe uma importação exatamente como essa: “${m.arquivo}”, em ${nomeConta(m.conta)}, de ${fmtD(m.de)} a ${fmtD(m.ate)}, importada em ${fmtQuando(Date.parse(m.em))}. Importar de novo não adiciona nada.`
+      : `Todas as ${a.total} linhas deste arquivo já foram importadas antes. Importar de novo não adiciona nada.`);
+  } else if (a.conhecidas) partes.push(`${a.conhecidas === 1 ? '1 linha' : `${a.conhecidas} linhas`} de ${a.total} já ${a.conhecidas === 1 ? 'foi importada' : 'foram importadas'} antes e ${a.conhecidas === 1 ? 'vai ser pulada' : 'vão ser puladas'}.`);
+  if (a.iguais) partes.push(`${a.iguais === 1 ? '1 linha é igual' : `${a.iguais} linhas são iguais`} (mesma conta, data e valor) a transações que vieram de outro extrato e ${a.iguais === 1 ? 'pode ficar duplicada' : 'podem ficar duplicadas'}.`);
+  return partes.join(' ');
+}
+
+/** Pergunta antes de importar arquivos que repetem o que já está no app. */
+async function podeImportar(ss: Sessao[]): Promise<boolean> {
+  const com = ss.map(s => ({ s, a: avisoDe(s) })).filter(x => temAviso(x.a));
+  if (!com.length) return true;
+  if (com.length === 1 && ss.length === 1) {
+    const a = com[0].a;
+    return confirmar(todasRepetidas(a) ? 'Importação repetida' : 'Linhas repetidas', `${textoAviso(a)} Deseja continuar?`, { sim: 'Importar mesmo assim' });
+  }
+  return confirmar('Arquivos com repetição', `${com.length === 1 ? 'Um arquivo repete' : `${com.length} arquivos repetem`} o que já está no app. Deseja continuar?`,
+    { detalhes: com.map(x => `${x.s.arquivo}: ${textoAviso(x.a)}`), sim: 'Importar mesmo assim' });
+}
+
 function passo() {
   const el = document.getElementById('iPasso');
   if (!el) return;
@@ -225,6 +264,7 @@ function passoLote(el: HTMLElement) {
     <h2>${lote.length} arquivos</h2>
     <div class="arqs">${lote.map((s, i) => `<div class="arq">
       <div class="arq-cab"><b>${esc(s.arquivo)}</b>${s.erro ? '' : `<span class="sub">${infoLinhas(s)}</span>`}</div>
+      ${!s.erro && !s.resultado && (s.conta || s.tipo === 'finai') ? (a => (temAviso(a) ? `<div class="repetido">${esc(textoAviso(a))}</div>` : ''))(avisoDe(s)) : ''}
       ${s.erro ? `<div class="err">${esc(s.erro)}</div>`
         : s.resultado ? `<div class="ok">Importado em ${esc(s.resultado.map(r => nomeConta(r.conta)).join(', '))}: ${resumoImp(s.resultado)}.</div>`
         : `${linhaFonte(s, i)}
@@ -248,6 +288,7 @@ function passoLote(el: HTMLElement) {
   $('#btnLimpar').onclick = () => { lote = []; aberto = -1; passo(); };
   $('#btnImpLote').onclick = async () => {
     if (ocupado) return;
+    if (!(await podeImportar(lote.filter(pronta)))) return;
     ocupado = true;
     passo();
     try {
@@ -289,7 +330,8 @@ function ligarCriar(el: HTMLElement) {
 function cabecalho(s: Sessao) {
   return `<div class="row between"><h2>${esc(s.arquivo)}</h2>${lote.length > 1 ? '<button type="button" class="btn small" id="btnLista">Voltar à lista</button>' : ''}</div>
     ${linhaFonte(s, aberto)}
-    <div class="field"><label for="iConta">Conta do arquivo</label>${seletorConta(s, 'id="iConta"')}</div>`;
+    <div class="field"><label for="iConta">Conta do arquivo</label>${seletorConta(s, 'id="iConta"')}</div>
+    ${s.conta ? (a => (temAviso(a) ? `<div class="repetido">${esc(textoAviso(a))}</div>` : ''))(avisoDe(s)) : ''}`;
 }
 
 function ligarCabecalho(el: HTMLElement, s: Sessao) {
@@ -396,6 +438,7 @@ function passoTabela(el: HTMLElement, s: Sessao) {
   $('#mAba')?.addEventListener('change', () => { s.aba = ($('#mAba') as HTMLSelectElement).value; s.rows = s.lerAba!(s.aba); s.ed = undefined; s.sel = undefined; aplicarModelo(s); passo(); });
   ligarCabecalho(el, s);
   $('#btnImp').onclick = async () => {
+    if (!(await podeImportar([s]))) return;
     // Num lote, o modelo é sempre salvo (é ele que faz o app reconhecer o arquivo da próxima vez).
     const salvar = ($('#mSalvar') as HTMLInputElement | null)?.checked ?? true;
     s.resultado = [await importar(s.conta, conv.linhas, s.arquivo, s.ed)];
@@ -427,7 +470,7 @@ function passoOfx(el: HTMLElement, s: Sessao) {
   $('#oInv').onchange = () => { s.inverter = ($('#oInv') as HTMLInputElement).checked; passo(); };
   ligarCabecalho(el, s);
   ligarLinhas(el, s);
-  $('#btnImp').onclick = async () => { s.resultado = [await importar(s.conta, linhas, s.arquivo, s.ed)]; terminouUm(); };
+  $('#btnImp').onclick = async () => { if (!(await podeImportar([s]))) return; s.resultado = [await importar(s.conta, linhas, s.arquivo, s.ed)]; terminouUm(); };
 }
 
 function passoPdf(el: HTMLElement, s: Sessao) {
@@ -440,7 +483,7 @@ function passoPdf(el: HTMLElement, s: Sessao) {
   </section>`;
   ligarCabecalho(el, s);
   ligarLinhas(el, s);
-  $('#btnImp').onclick = async () => { s.resultado = [await importar(s.conta, p.linhas, s.arquivo, s.ed)]; terminouUm(); };
+  $('#btnImp').onclick = async () => { if (!(await podeImportar([s]))) return; s.resultado = [await importar(s.conta, p.linhas, s.arquivo, s.ed)]; terminouUm(); };
 }
 
 function passoFinai(el: HTMLElement, s: Sessao) {
@@ -457,7 +500,7 @@ function passoFinai(el: HTMLElement, s: Sessao) {
   el.querySelectorAll<HTMLSelectElement>('[data-dest]').forEach(x => (x.onchange = () => { s.destino![x.dataset.dest!] = x.value; }));
   $('#btnLista')?.addEventListener('click', () => { aberto = -1; passo(); });
   $('#btnCancelar').onclick = fechar;
-  $('#btnImp').onclick = async () => { s.resultado = await importarFinai(s); terminouUm(); };
+  $('#btnImp').onclick = async () => { if (!(await podeImportar([s]))) return; s.resultado = await importarFinai(s); terminouUm(); };
 }
 
 async function importarFinai(s: Sessao): Promise<Importacao[]> {
