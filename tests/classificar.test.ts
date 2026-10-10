@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classificar, indicePalavras, resumoMes, saldoEstimado, serieMeses, SEM_CATEGORIA } from '../src/core/classificar';
+import { classificar, mesDaFatura, indicePalavras, resumoMes, saldoEstimado, serieMeses, SEM_CATEGORIA } from '../src/core/classificar';
 import { CATEGORIAS_INICIAIS } from '../src/core/padroes';
 import type { Conta, Transacao } from '../src/core/tipos';
 import { termoDe } from '../src/core/util';
@@ -180,5 +180,35 @@ describe('fatura paga com o valor arredondado', () => {
     const ts = [tx('mp', '2026-08-26', 'Pix enviado Fulano de Tal Souza', -2000), tx('rico', '2026-08-31', 'Pagamento de fatura', 586.65)];
     const cls = classificar(ts, { ...ctx, contas: cs, titular });
     expect(cls[1].par).toBeUndefined();
+  });
+});
+
+describe('o que não é pagamento de fatura', () => {
+  const cs: Conta[] = [...contas,
+    { id: 'rico', nome: 'Rico crédito', banco: 'Rico', tipo: 'cartao', ativa: true },
+    { id: 'flash', nome: 'Flash alimentação', banco: 'Flash', tipo: 'corrente', ativa: true }];
+  const c = { ...ctx, contas: cs };
+  it('estorno no cartão não é pagamento (nem com Pix de valor parecido)', () => {
+    const cls = classificar([tx('mpc', '2026-09-23', 'Uber - NuPay', 47.94), tx('mp', '2026-09-26', 'Pix enviado Fulano', -50)], c);
+    expect(cls.map(x => x.t)).toEqual(['saida', 'saida']);
+    expect(cls[0].par).toBeUndefined();
+  });
+  it('compra no vale nunca paga fatura', () => {
+    const cls = classificar([tx('rico', '2026-08-31', 'Pagamento de fatura', 586.65), tx('flash', '2026-08-30', 'Pix enviado', -586.65)], c);
+    expect(cls[0].par).toBeUndefined();
+    expect(cls[1].t).toBe('saida');
+  });
+  it('compra numa loja com valor sem centavos não é o Pix da fatura', () => {
+    const cls = classificar([tx('rico', '2026-08-31', 'Pagamento de fatura', 1118.30), tx('mp', '2026-08-29', 'LOJA DE MOVEIS', -1119)], c);
+    expect(cls[0].par).toBeUndefined();
+  });
+});
+
+describe('mês da fatura', () => {
+  it('pagamento no começo do mês é a fatura do mês anterior', () => {
+    expect(mesDaFatura('2026-10-05')).toBe('2026-09');
+    expect(mesDaFatura('2026-08-31')).toBe('2026-08');
+    expect(mesDaFatura('2026-08-02')).toBe('2026-07');
+    expect(mesDaFatura('2026-01-10')).toBe('2025-12');
   });
 });

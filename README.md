@@ -172,7 +172,11 @@ não houver, pela **fatura arredondada em reais**: valor sem centavos a até R$ 
 qualquer descrição (ex.: fatura de R$ 1.118,30 paga com R$ 1.118, 1.119 ou 1.120); por último, até 15%
 (ou R$ 50) de diferença, só quando o Pix é para você mesmo (seu nome, em Ajustes) ou cita o banco do
 cartão (Rico/XP, Nubank/Nu Pagamentos…).
-A sobra fica na conta do banco e não conta como gasto (é dinheiro seu). Os dois
+A sobra fica na conta do banco e não conta como gasto (é dinheiro seu). Só conta como pagamento o
+que o cartão mostra como pagamento de fatura (crédito comum no cartão é estorno), a saída nunca vem
+de conta de vale (Flash, Alelo…) e, nos casos aproximados, precisa ter cara de pagamento (Pix,
+transferência, boleto) e a fatura ser de pelo menos R$ 50. Cada fatura aparece no **mês dos gastos
+dela**: o pagamento feito no começo do mês (ex.: dia 5) é a fatura do mês anterior. Os dois
 ficam como “Pagamento de fatura”. O Painel mostra **Faturas pagas** no mês (cartão, valor, data e o
 Pix que pagou) e a transação mostra a outra ponta.
 

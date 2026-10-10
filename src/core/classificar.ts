@@ -2,10 +2,17 @@
 // saída de verdade, o que é dinheiro seu só mudando de lugar (caixinha, outra conta sua, pagamento
 // da fatura) e em que categoria cada gasto cai. Funções puras, testadas em tests/classificar.test.ts.
 import type { Categoria, Conta, RegraCat, TipoTx, Transacao } from './tipos';
-import { diasEntre, norm } from './util';
+import { diasEntre, norm, somaDias } from './util';
 
 const CAIXINHA = / (caixinhas?|cofrinhos?|cofre|dinheiro reservado|dinheiro retirado|reservado|reserva por|retirada da reserva|guardado|porquinho|aplicacao|aplic|resgate|cdb|lci|lca|tesouro direto|investimento|fundo de investimento|previdencia) /;
 const FATURA = / (pagamento (da |de )?fatura|pagto fatura|pgto fatura|pagamento cartao|pagamento de cartao|fatura cartao|pagamento recebido|pagamento efetuado|credit card payment) /;
+
+/** Conta de vale-refeição/alimentação (Flash, Alelo…): não paga fatura nem recebe Pix seu. */
+const VALES = /\b(flash|alelo|sodexo|pluxee|ticket|vr beneficios|vr|caju|swile|ben visa|valecard|greencard)\b/;
+export const ehContaVale = (c?: Pick<Conta, 'banco' | 'nome'>) => !!c && VALES.test(norm(c.banco + ' ' + c.nome));
+
+/** Saída que pode ser o pagamento de uma fatura (não uma compra numa loja). */
+const PAGAVEL = / (pix|transf\w*|ted|doc|boleto|pagamento|pgto|pagto|fatura|debito automatico|deposito) /;
 
 /** Outros nomes com que o banco do cartão aparece na descrição de um Pix. */
 const APELIDOS: Record<string, string[]> = {
@@ -114,9 +121,12 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
   // A sobra fica na conta do banco do cartão (ou a falta sai do que já estava lá): não é gasto.
   const ehCartao = (x: Classificada) => tipoConta.get(x.conta) === 'cartao';
   const bancoDe = new Map(ctx.contas.map(c => [c.id, norm(c.banco).trim()]));
-  const pagamentos = out.filter(x => ehCartao(x) && (x.t === 'fatura' || (x.valor > 0 && x.auto && !x.tipo))).sort((a, b) => a.data.localeCompare(b.data));
+  // Só o que é pagamento de fatura no cartão ("Pagamento recebido", regra, sua escolha). Crédito
+  // qualquer no cartão é estorno, não pagamento.
+  const vale = new Set(ctx.contas.filter(c => ehContaVale(c)).map(c => c.id));
+  const pagamentos = out.filter(x => ehCartao(x) && x.t === 'fatura').sort((a, b) => a.data.localeCompare(b.data));
   const antes = (cc: Classificada, x: Classificada) => (Date.parse(cc.data) - Date.parse(x.data)) / 864e5;
-  const podePagar = (cc: Classificada, x: Classificada) => !usados.has(x) && !ehCartao(x) && x.valor < 0
+  const podePagar = (cc: Classificada, x: Classificada) => !usados.has(x) && !ehCartao(x) && !vale.has(x.conta) && x.valor < 0
     && antes(cc, x) <= 10 && antes(cc, x) >= -5 && (x.t === 'fatura' || (x.auto && (x.t === 'saida' || x.t === 'interna')));
   const citaBanco = (cc: Classificada, x: Classificada) => {
     const d = norm(x.desc), b = bancoDe.get(cc.conta) || '';
@@ -143,10 +153,19 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
         || Math.abs(antes(cc, a)) - Math.abs(antes(cc, b)))[0]);
     }
   };
-  aproximar((_, x, v) => semCentavos(x) && Math.abs(-x.valor - v) <= Math.max(5, v * 0.01));
-  aproximar((cc, x, v) => proprio(cc, x) && Math.abs(-x.valor - v) <= Math.max(50, v * 0.15));
+  // Aproximado: só fatura de R$ 50 ou mais e saída com cara de pagamento (Pix, transferência, boleto…).
+  const pagavel = (x: Classificada) => PAGAVEL.test(norm(x.desc)) || x.t === 'fatura';
+  aproximar((_, x, v) => v >= 50 && pagavel(x) && semCentavos(x) && Math.abs(-x.valor - v) <= Math.max(5, v * 0.01));
+  aproximar((cc, x, v) => v >= 50 && proprio(cc, x) && Math.abs(-x.valor - v) <= Math.max(50, v * 0.15));
   return out;
 }
+
+/**
+ * Mês da fatura que um pagamento quita: a fatura vence no começo do mês seguinte ao dos gastos
+ * (ex.: paga em 05/10 = fatura de setembro; paga em 31/08 = fatura de agosto). Regra: 15 dias antes
+ * da data do pagamento.
+ */
+export const mesDaFatura = (data: string) => somaDias(data, -15).slice(0, 7);
 
 export const SEM_CATEGORIA = 'Sem categoria';
 

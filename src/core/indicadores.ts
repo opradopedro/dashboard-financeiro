@@ -1,7 +1,7 @@
 // Indicadores do Painel: forma de pagamento, gasto por conta, ritmo do mês (acumulado dia a dia e
 // comparação com o mês anterior), dias da semana, maiores gastos e lugares onde mais gastou.
 // Tudo conta só as saídas (gasto); estorno (saída com valor positivo) desconta.
-import type { Classificada } from './classificar';
+import { ehContaVale, type Classificada } from './classificar';
 import type { Conta } from './tipos';
 import { norm, somaMes, termoDe } from './util';
 
@@ -10,13 +10,11 @@ export const FORMAS: Record<Forma, string> = {
   credito: 'Crédito', pix: 'Pix', debito: 'Débito', vale: 'Vale-benefício', boleto: 'Boleto e contas', transferencia: 'Transferência', saque: 'Saque',
 };
 
-/** Empresas de vale-refeição/alimentação: o gasto nelas é "vale", não débito. */
-const VALES = /\b(flash|alelo|sodexo|pluxee|ticket|vr beneficios|vr|caju|swile|ben visa|valecard|greencard)\b/;
 
 /** Forma de pagamento de um gasto, pelo tipo da conta e pela descrição. */
 export function formaPagamento(x: { desc: string; origens?: { desc: string }[] }, conta?: Conta): Forma {
   if (conta?.tipo === 'cartao') return 'credito';
-  if (conta && VALES.test(norm(conta.banco + ' ' + conta.nome))) return 'vale';
+  if (ehContaVale(conta)) return 'vale';
   const t = norm([x.desc, ...(x.origens || []).map(o => o.desc)].join(' '));
   if (/ pix | qr ?code | qr /.test(t)) return 'pix';
   if (/ boleto | pagamento de conta | conta de (luz|agua|gas|telefone|internet) | convenio /.test(t)) return 'boleto';

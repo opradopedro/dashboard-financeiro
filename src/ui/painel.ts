@@ -1,7 +1,7 @@
 // Painel (adaptado do carteira, src/ui/banco.ts): entradas e saídas reais do mês, gastos por
 // categoria, gráfico de 12 meses e o que precisa de atenção.
 import { classificadas, nomeConta, state } from '../app';
-import { resumoMes, saldoEstimado, serieMeses, SEM_CATEGORIA, type Classificada } from '../core/classificar';
+import { mesDaFatura, resumoMes, saldoEstimado, serieMeses, SEM_CATEGORIA, type Classificada } from '../core/classificar';
 import { FORMAS, lugares, maioresGastos, porConta, porDiaSemana, porForma, ritmo, acumulado } from '../core/indicadores';
 import { TIPOS, contaNoTotal } from '../core/tipos';
 import { hoje, somaDias, somaMes } from '../core/util';
@@ -260,19 +260,20 @@ function blocoFaturas(cls: Classificada[], mes: string) {
   const contas = state.dados.contas;
   const cartao = (id: string) => contas.find(c => c.id === id)?.tipo === 'cartao';
   const porId = new Map(cls.map(x => [x.id, x]));
-  const doMes = cls.filter(x => x.t === 'fatura' && x.data.slice(0, 7) === mes);
+  // Cada pagamento entra no mês da fatura que ele quita (pago em 05/10 = fatura de setembro).
+  const doMes = cls.filter(x => x.t === 'fatura' && mesDaFatura(x.data) === mes).sort((a, b) => a.data.localeCompare(b.data));
   const itens = doMes.filter(x => cartao(x.conta)).map(cc => {
     const p = cc.par ? porId.get(cc.par) : undefined;
     return `<button type="button" class="item" data-ir="tx/${esc(cc.id)}"><div class="name">${esc(nomeConta(cc.conta))}</div><div class="val">${brl(Math.abs(cc.valor))}</div>
-      <div class="meta">${p ? `Paga em ${fmtD(cc.data)} com ${esc(p.desc)} (${esc(nomeConta(p.conta))}, ${fmtD(p.data)})${sobra(cc, p)}.` : `Paga em ${fmtD(cc.data)}. O app não achou o Pix ou débito que pagou${state.dados.config.titular ? '' : ' (se foi um Pix para você mesmo, informe seu nome em Ajustes)'}.`}</div><div class="meta r"></div></button>`;
+      <div class="meta">${p ? `Paga em ${fmtD(cc.data)} com ${esc(p.desc)} (${esc(nomeConta(p.conta))}, ${fmtD(p.data)})${sobra(cc, p)}.` : `Paga em ${fmtD(cc.data)}. O dinheiro saiu de uma conta que não está no app, ou o extrato dela (desse período) ainda não foi importado.`}</div><div class="meta r"></div></button>`;
   });
   // Pagamento na conta sem o lançamento no cartão (ex.: fatura do cartão ainda não importada).
   for (const x of doMes) if (!cartao(x.conta) && !(x.par && porId.has(x.par)) && x.valor < 0)
     itens.push(`<button type="button" class="item" data-ir="tx/${esc(x.id)}"><div class="name">${esc(x.desc)}</div><div class="val">${brl(-x.valor)}</div>
       <div class="meta">${esc(nomeConta(x.conta))}, ${fmtD(x.data)}. Sem o pagamento no cartão: importe a fatura para ligar os dois.</div><div class="meta r"></div></button>`);
   if (!itens.length) return '';
-  return `<section class="panel"><h2>Faturas pagas</h2><div class="folha"><div class="list">${itens.join('')}</div></div>
-    <p class="note">O dinheiro que você manda para pagar a fatura e o pagamento no cartão são a mesma coisa: ficam fora de entradas e gastos, porque cada compra já contou no dia em que foi feita.</p></section>`;
+  return `<section class="panel"><div class="row between"><h2>Faturas de ${mesLongo(mes).split(' de ')[0]}</h2></div><div class="folha"><div class="list">${itens.join('')}</div></div>
+    <p class="note">Cada fatura aparece no mês dos gastos dela, mesmo paga no começo do mês seguinte. O dinheiro que você manda para pagar e o pagamento no cartão são a mesma coisa: ficam fora de entradas e gastos, porque cada compra já contou no dia em que foi feita.</p></section>`;
 }
 
 export function telaCategoria(el: HTMLElement, cat: string) {

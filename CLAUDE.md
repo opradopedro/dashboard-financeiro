@@ -105,11 +105,15 @@ Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INI
   o tipo/categoria **final** é calculado em `classificar()` (nunca gravado):
   `tipoUsuario` > regra de categoria > `tipo` da regra de notificação > `tipoAuto()` pela descrição.
   Depois junta pares, com `par` apontando a outra ponta: Pix entre contas suas = interna (±3 dias);
-  pagamento no cartão (FATURA em qualquer sinal, ou crédito sem explicação) + saída da conta de
+  pagamento no cartão (só tipo fatura: FATURA em qualquer sinal, regra ou escolha; crédito comum no
+  cartão é estorno) + saída de conta que não é vale (`ehContaVale`) de
   mesmo valor, de 10 dias antes a 5 depois = fatura (prefere a que cita o banco do cartão); sem valor
   igual, valor sem centavos a até R$ 5 ou 1% (o dono costuma mandar a fatura arredondada em reais:
   1.118,30 → 1.118/1.119/1.120); por último, até 15% ou R$ 50 se a saída tem o nome do titular ou
-  cita o banco (`APELIDOS`). A sobra fica na conta do banco.
+  cita o banco (`APELIDOS`). Os aproximados exigem fatura >= R$ 50 e saída com cara de pagamento
+  (`PAGAVEL`: Pix, transferência, boleto…). A sobra fica na conta do banco. `mesDaFatura(data)` =
+  mês de 15 dias antes do pagamento (pago dia 5 = fatura do mês anterior); o Painel mostra as faturas
+  nesse mês.
 - Categoria: `cat` > regra de categoria > palavras-chave (trecho mais longo vence; entrada só em
   categoria de receita) > sem categoria (`''`, exibido “Sem categoria”).
 - Painel conta só `entrada` e `saida`. Estorno no cartão = `saida` com valor positivo.
