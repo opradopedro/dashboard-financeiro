@@ -127,6 +127,13 @@ Categorização automática por palavras-chave (editáveis em Ajustes → Catego
 longo; `*` no fim = começo de palavra) e por regras criadas ao corrigir transações. O que ficou sem
 categoria aparece no painel (“Categorizar N transações”).
 
+### Regras de categoria (ex.: salário)
+Para dizer “o que vem de tal pagador é salário”: Ajustes → Regras → **De categoria** → *Nova regra
+de categoria*, com o trecho (ex.: `itau unibanco`), tipo **Entrada** e categoria **Salário**. Ou
+abra uma dessas transações, escolha tipo e categoria, marque *aplicar* e ajuste o trecho. A regra
+vale para extrato e notificação e vem antes da classificação automática (inclusive do “Pix para
+você mesmo” e da junção de transferências entre contas).
+
 ### Seu nome
 Em **Ajustes → Seu nome**, escreva seu nome como aparece nos bancos. Pix de você para você mesmo
 (por exemplo “Pix recebido FULANO DE TAL” vindo de outra conta sua) passa a contar como

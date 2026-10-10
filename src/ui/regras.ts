@@ -2,8 +2,8 @@
 // notificações já registradas.
 import { enviarPacotes, mudar, nomeApp, nomeConta, state } from '../app';
 import { aplicarRegra, sentidoPadrao, sugerirPadrao } from '../core/regras';
-import { ACOES, ORIGENS_REGRA, TIPOS, type AcaoRegra, type OrigemRegra, type RegraNotif } from '../core/tipos';
-import { uid } from '../core/util';
+import { ACOES, ORIGENS_REGRA, TIPOS, type AcaoRegra, type OrigemRegra, type RegraNotif, type TipoTx } from '../core/tipos';
+import { norm, uid } from '../core/util';
 import { $, esc, fmtD, opcoes, sinal, toast } from './fmt';
 import { trocar, voltar, type Rota } from './nav';
 
@@ -22,7 +22,14 @@ export function telaRegras(el: HTMLElement, r: Rota) {
       <div class="meta r">prioridade ${x.prioridade}</div></button>`;
   let corpo: string;
   if (tipo === 'cat') {
-    corpo = `<p class="sub">Criadas quando você corrige uma transação e marca “aplicar às parecidas”: tudo que contém o termo recebe o tipo e a categoria.</p>
+    corpo = `<p class="sub">Tudo que contém o trecho na descrição (do extrato ou da notificação) recebe o tipo e a categoria. Valem antes da classificação automática. Exemplo: “itau unibanco”, Entrada, Salário.</p>
+      <section class="caixa"><h3>Nova regra de categoria</h3>
+        <form id="fRegraCat" class="form" autocomplete="off">
+          <div class="field full"><label for="rcTermo">A descrição contém</label><input id="rcTermo" placeholder="itau unibanco" autocapitalize="off" spellcheck="false" required></div>
+          <div class="field"><label for="rcTipo">Tipo</label><select id="rcTipo"><option value="">Não mudar</option>${opcoes(Object.entries(TIPOS).map(([v, t]) => ({ v, t })))}</select></div>
+          <div class="field"><label for="rcCat">Categoria</label><select id="rcCat"><option value="">Não mudar</option>${opcoes(d.categorias.map(c => ({ v: c.nome, t: c.nome })))}</select></div>
+          <div class="row full"><button class="btn primary" type="submit">Criar regra</button></div>
+        </form></section>
       <div class="folha"><div class="list">${d.regrasCat.map(x => `<div class="item"><div class="name">“${esc(x.termo)}”</div>
       <div class="val"><button type="button" class="btn small danger" data-delcat="${esc(x.id)}">Excluir</button></div>
       <div class="meta">${[x.tipo ? TIPOS[x.tipo] : '', x.cat || ''].filter(Boolean).join(', ')}</div><div class="meta r"></div></div>`).join('') || '<div class="empty">Nenhuma regra de categoria ainda.</div>'}</div></div>`;
@@ -54,6 +61,16 @@ export function telaRegras(el: HTMLElement, r: Rota) {
   <div class="seg" role="group" aria-label="Origem"><button type="button" data-q="${q({ origem: '' })}" aria-pressed="${!origem}">Todas as origens</button>${(Object.keys(ORIGENS_REGRA) as OrigemRegra[]).map(o => `<button type="button" data-q="${q({ origem: o })}" aria-pressed="${o === origem}">${ORIGENS_REGRA[o]} (${contagem(o)})</button>`).join('')}</div>`}
   ${corpo}`;
   el.querySelectorAll<HTMLButtonElement>('[data-q]').forEach(b => (b.onclick = () => trocar('regras' + b.dataset.q)));
+  $('#fRegraCat')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const termo = norm(($('#rcTermo') as HTMLInputElement).value).trim();
+    const tipoSel = ($('#rcTipo') as HTMLSelectElement).value as TipoTx | '';
+    const cat = ($('#rcCat') as HTMLSelectElement).value;
+    if (!termo || (!tipoSel && !cat)) { toast('Escreva o trecho e escolha o tipo ou a categoria.'); return; }
+    await mudar(dd => ({ ...dd, regrasCat: [...dd.regrasCat.filter(x => x.termo !== termo), { id: uid('rc'), termo, ...(tipoSel ? { tipo: tipoSel } : {}), ...(cat ? { cat } : {}) }] }));
+    toast(`Regra criada para “${termo}”.`);
+    dispatchEvent(new Event('rerender'));
+  });
   el.querySelectorAll<HTMLButtonElement>('[data-delcat]').forEach(b => (b.onclick = async () => {
     await mudar(dd => ({ ...dd, regrasCat: dd.regrasCat.filter(x => x.id !== b.dataset.delcat) }));
     dispatchEvent(new Event('rerender'));

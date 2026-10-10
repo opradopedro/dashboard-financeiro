@@ -58,6 +58,7 @@ export function telaTx(el: HTMLElement, id: string) {
   const tipo: TipoTx = x?.t || 'saida';
   const cat = x?.c || '';
   const termo = x ? termoDe(x.desc) : '';
+
   const cats = d.categorias;
   el.innerHTML = `
   ${x ? `<section class="fita">
@@ -76,7 +77,9 @@ export function telaTx(el: HTMLElement, id: string) {
       <div class="field"><label for="tConta">Conta</label><select id="tConta">${opcoes(d.contas.filter(c => c.ativa || c.id === base.conta).map(c => ({ v: c.id, t: c.nome })), base.conta)}</select></div>
       <div class="field"><label for="tCat">Categoria</label><select id="tCat"><option value="">${SEM_CATEGORIA}</option>${opcoes(cats.map(c => ({ v: c.nome, t: c.nome + (c.receita ? ' (entrada)' : '') })), cat)}</select></div>
       <div class="field full"><label for="tNota">Observação</label><input id="tNota" value="${esc(base.nota || '')}"></div>
-      ${termo ? `<label class="check full"><input type="checkbox" id="tParecidas"> Aplicar tipo e categoria a todas que contêm “${esc(termo)}” (inclusive as próximas)</label>` : ''}
+      ${x ? `<label class="check full"><input type="checkbox" id="tParecidas"> Aplicar este tipo e esta categoria a todas que contêm o trecho abaixo, inclusive as próximas</label>
+      <div class="field full"><label for="tTermo">Trecho da descrição</label><input id="tTermo" value="${esc(termo)}" autocapitalize="off" spellcheck="false">
+        <span class="note">Deixe só o que identifica (ex.: o nome de quem paga). Vale para extrato e notificação.</span></div>` : ''}
       <div class="row full"><button class="btn primary" type="submit">${nova ? 'Lançar' : 'Salvar'}</button>
         ${x && (x.tipoUsuario || x.cat) ? '<button type="button" class="btn" id="btnAuto">Voltar ao automático</button>' : ''}
         ${x ? '<button type="button" class="btn danger" id="btnExcluir">Excluir</button>' : ''}</div>
@@ -106,6 +109,7 @@ export function telaTx(el: HTMLElement, id: string) {
       if (catSel !== x!.c) { if (catSel) t.cat = catSel; else { delete t.cat; } }
     }
     const parecidas = ($('#tParecidas') as HTMLInputElement | null)?.checked;
+    const termo = norm(($('#tTermo') as HTMLInputElement | null)?.value || '').trim();
     await salvarTx(t);
     if (parecidas && termo) {
       await mudar(dd => ({ ...dd, regrasCat: [...dd.regrasCat.filter(r => r.termo !== termo), { id: uid('rc'), termo, tipo: tipoSel, ...(catSel ? { cat: catSel } : {}) }] }));

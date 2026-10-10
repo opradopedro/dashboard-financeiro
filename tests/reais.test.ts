@@ -135,3 +135,21 @@ describe('categorias com as descrições reais', () => {
     expect(indicePalavras(CATEGORIAS_INICIAIS)(d, false)).toBe(c);
   });
 });
+
+describe('Pix do Itaú (salário) com regra de categoria', () => {
+  it('extrato, notificação e Pix com mesmo valor saindo de outra conta: continua entrada/Salário', async () => {
+    const { classificar, resumoMes } = await import('../src/core/classificar');
+    const { CATEGORIAS_INICIAIS, CONTAS_INICIAIS } = await import('../src/core/padroes');
+    const { norm } = await import('../src/core/util');
+    const regrasCat = [{ id: 'r', termo: norm('Itau Unibanco').trim(), tipo: 'entrada' as const, cat: 'Salário' }];
+    const t = (id: string, conta: string, desc: string, valor: number, extra = {}) => ({ id, conta, data: '2026-09-25', desc, valor, origens: [], criadoEm: '', ...extra });
+    const cls = classificar([
+      t('a', 'mercadopago-conta', 'Pix recebido Itau Unibanco S.A', 136.04),
+      t('b', 'mercadopago-conta', 'Pix de Itau Unibanco S.A.', 2500, { tipo: 'interna' }), // ex.: notificação de "depósito"
+      t('c', 'mercadopago-conta', 'Pix recebido Itau Unibanco S.A', 300),
+      t('d', 'flash', 'Transferência enviada', -300), // mesmo valor saindo de outra conta: não vira "interna"
+    ], { contas: CONTAS_INICIAIS, categorias: CATEGORIAS_INICIAIS, regrasCat, titular: 'Itau Unibanco' });
+    expect(cls.slice(0, 3).map(x => [x.t, x.c])).toEqual([['entrada', 'Salário'], ['entrada', 'Salário'], ['entrada', 'Salário']]);
+    expect(resumoMes(cls, '2026-09').entradasPorCategoria[0]).toMatchObject({ cat: 'Salário', v: 2936.04 });
+  });
+});
