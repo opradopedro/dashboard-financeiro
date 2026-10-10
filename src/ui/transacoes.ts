@@ -6,6 +6,7 @@ import { arred, hoje, norm, parseValor, termoDe, uid } from '../core/util';
 import { $, esc, fmtD, fmtQuando, opcoes, sinal, toast } from './fmt';
 import { campoCategoria, confirmar, ligarCampoCategoria, valorCampo } from './escolher';
 import { transacaoIgual } from '../core/duplicadas';
+import { definirCategoria } from '../core/sugestoes';
 import { itemTx, listaPorDia, mesAtual, navMes, sobra } from './painel';
 import { blocoReembolso, explicarCategoria, ligarReembolso } from './reembolsos';
 import type { Rota } from './nav';
@@ -79,6 +80,9 @@ export function telaTx(el: HTMLElement, id: string) {
       <div class="field"><label for="tConta">Conta</label><select id="tConta">${opcoes(d.contas.filter(c => c.ativa || c.id === base.conta).map(c => ({ v: c.id, t: c.nome })), base.conta)}</select></div>
       <div class="field"><label for="tCat">Categoria</label>${campoCategoria('tCat', cat)}</div>
       ${x && explicarCategoria(x) ? `<p class="note full">${esc(explicarCategoria(x))}</p>` : ''}
+      ${x && (x.reembolsos?.length || (x.reembolsa && x.par)) ? `<p class="vinculo full">${x.reembolsos?.length
+        ? `Ligado ${x.reembolsos.length === 1 ? 'a 1 reembolso' : `a ${x.reembolsos.length} reembolsos`}: a categoria é a mesma nos dois. Mudar aqui muda lá também.`
+        : 'Ligado ao gasto que este reembolso paga: a categoria é a mesma nos dois. Mudar aqui muda lá também.'}</p>` : ''}
       <div class="field full"><label for="tNota">Observação</label><input id="tNota" value="${esc(base.nota || '')}"></div>
       ${x ? `<label class="check full"><input type="checkbox" id="tParecidas"> Aplicar este tipo e esta categoria a todas que contêm o trecho abaixo, inclusive as próximas</label>
       <div class="field full"><label for="tTermo">Trecho da descrição</label><input id="tTermo" value="${esc(termo)}" autocapitalize="off" spellcheck="false">
@@ -107,13 +111,15 @@ export function telaTx(el: HTMLElement, id: string) {
     if (!Number.isFinite(valor) || valor === 0) { toast('Valor inválido.'); return; }
     const tipoSel = v('#tTipo') as TipoTx;
     const catSel = valorCampo('tCat');
+    let mudouCat = false;
     const t: Transacao = { ...base, data: v('#tData'), desc: v('#tDesc'), conta: v('#tConta'), valor: arred(v('#tSentido') === 'sai' ? -valor : valor) };
     if (v('#tNota')) t.nota = v('#tNota'); else delete t.nota;
     // Tipo e categoria só ficam "fixos" se você mudou o que o app tinha decidido.
     if (nova) { t.tipoUsuario = tipoSel; t.origens = [{ tipo: 'manual', ref: t.id, em: t.criadoEm, data: t.data, desc: t.desc, valor: t.valor }]; if (catSel) t.cat = catSel; }
     else {
       if (tipoSel !== x!.t) t.tipoUsuario = tipoSel;
-      if (catSel !== x!.c) { if (catSel) t.cat = catSel; else { delete t.cat; } }
+      // Categoria: gravada depois, respeitando o vínculo com reembolso (definirCategoria).
+      mudouCat = catSel !== x!.c;
     }
     // Igual a uma que já existe? (lançada à mão de novo, ou já veio por notificação/extrato)
     const igual = transacaoIgual(state.dados.txs, t);
@@ -129,6 +135,7 @@ export function telaTx(el: HTMLElement, id: string) {
     const parecidas = ($('#tParecidas') as HTMLInputElement | null)?.checked;
     const termo = norm(($('#tTermo') as HTMLInputElement | null)?.value || '').trim();
     await salvarTx(t);
+    if (mudouCat) await mudar(dd => ({ ...dd, txs: definirCategoria(dd.txs, [t.id], catSel) }));
     if (parecidas && termo) {
       await mudar(dd => ({ ...dd, regrasCat: [...dd.regrasCat.filter(r => r.termo !== termo), { id: uid('rc'), termo, tipo: tipoSel, ...(catSel ? { cat: catSel } : {}) }] }));
       toast(`Regra criada para “${termo}”.`);

@@ -344,3 +344,16 @@ select:not([multiple]){pointer-events:none}
 .cand{flex-wrap:wrap}
 .cand > .item{flex:1 1 100%;border-top:0}
 .cand > .btn{margin-left:auto}
+.vinculo{display:flex;gap:9px;font-size:13px;line-height:1.5;color:var(--champanhe)}
+.vinculo::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--champanhe);flex:none;margin-top:7px}
+
+/* ---------- seleção de várias transações (toque longo) ---------- */
+.item.tx{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.selecionando .item.tx .marca{box-shadow:inset 0 0 0 1.5px var(--linha-forte)}
+.item.tx.marcada{background:linear-gradient(90deg,rgba(217,200,164,.1),transparent)}
+.item.tx.marcada .marca{background:var(--champanhe);color:#1A1712;font-size:0;box-shadow:none}
+.item.tx.marcada .marca::after{content:"✓";font-size:16px;font-weight:700}
+.barra-sel{position:fixed;left:12px;right:12px;bottom:calc(72px + var(--sab));z-index:6;max-width:660px;margin-inline:auto;background:var(--lousa-alta);
+  border:1px solid var(--linha-forte);border-radius:var(--raio-m);padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 -8px 30px rgba(6,9,15,.5)}
+.barra-sel b{font-weight:600;font-size:14.5px}
+body.selecionando{padding-bottom:calc(230px + var(--sab))}

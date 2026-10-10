@@ -33,6 +33,7 @@ export const trocar = (rota: string) => location.replace('#/' + rota);
 export function voltar() {
   const dlg = document.querySelector('dialog[open]') as HTMLDialogElement | null;
   if (dlg) { dlg.close(); return; }
+  if (document.body.classList.contains('selecionando')) { dispatchEvent(new Event('sair-selecao')); return; }
   if (profundidade > 0) { profundidade--; history.back(); return; }
   if (rotaAtual().nome !== '') { aba(''); return; }
   void nativo.sair();

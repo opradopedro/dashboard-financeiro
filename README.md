@@ -188,6 +188,11 @@ importadas), a lista mostra **Importar novos** (em destaque, deixa os repetidos 
   antes a 30 depois); marque o certo, procure outro, ou "Reembolso sem ligar" (ex.: conta dividida).
   O reembolso sai das entradas e desconta do gasto, na categoria dele. O Painel avisa quando há
   entradas com um gasto de mesmo valor por perto.
+- **Reembolso e gasto ligados dividem a categoria:** mudar em um muda no outro (a categoria fica no
+  gasto); as duas telas mostram o vínculo.
+- **Mudar várias de uma vez:** em qualquer lista de transações, **toque e segure** numa delas para
+  marcar; toque em outras (ou **Marcar todas**) e use a barra: Categoria, Tipo, Conta, Inverter
+  sinal ou Excluir. Cancelar (ou o voltar do celular) sai da seleção.
 - **"Pagamento Cartão de crédito" na conta** sem a fatura do cartão no app conta como gasto (ex.:
   parcelas de uma compra pagas pelo cartão do banco).
 

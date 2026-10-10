@@ -137,7 +137,8 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
     if (!x.reembolsa) continue;
     const g = porId.get(x.reembolsa);
     if (!g) continue;
-    if (!x.cat) { x.c = g.c; x.fc = 'reembolso'; }
+    // A categoria do vínculo é a do gasto (a do reembolso só vale se o gasto não tiver nenhuma).
+    if (g.c) { x.c = g.c; x.fc = 'reembolso'; }
     x.par = g.id;
     (g.reembolsos ||= []).push(x.id);
   }

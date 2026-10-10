@@ -1,5 +1,8 @@
 {
-  "proxima": [],
+  "proxima": [
+    "Mudar várias transações de uma vez: em qualquer lista, toque e segure numa transação e marque outras (ou todas); a barra embaixo muda categoria, tipo ou conta, inverte o sinal ou exclui.",
+    "Reembolso e gasto ligados dividem a categoria: mudar em um muda no outro, e as duas telas mostram o vínculo."
+  ],
   "versoes": [
     {
       "versao": "1.9",

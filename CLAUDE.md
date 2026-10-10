@@ -159,6 +159,9 @@ cartões iguais para tudo. A peça marcante é o topo do Painel (mês grande + f
   e devolve a escolha com evento `change`. Mais de 8 opções = folha com busca.
 - Datas: use `<input type="date">` com `<label for>`; `ativarDatas()` (datas.ts) troca por campo
   dd/mm/aaaa + calendário do app e deixa o original escondido (mesmo id, valor AAAA-MM-DD).
+- Seleção de várias transações: qualquer `.item.tx` com `data-ir="tx/<id>"` dentro de `#view` entra na
+  seleção por toque longo (selecao.ts); `aplicarSelecao()` roda depois de cada render. Categoria em
+  massa (e na transação) passa por `definirCategoria` (sugestoes.ts): reembolso ligado grava no gasto.
 - Telas com `vivo: true` em `main.ts` são refeitas quando os dados mudam; formulários não.
   Para refazer a tela atual depois de uma ação: `dispatchEvent(new Event('rerender'))`.
 - Toda mudança de dados passa por `mudar(d => novoD)` (grava e notifica). Não mutar `state.dados`.

@@ -23,6 +23,7 @@ import { telaApps, telaAjustes, telaBoasVindas, telaCategorias, telaConta, telaC
 import { telaNovidades } from './ui/novidades';
 import { ativarSelects } from './ui/escolher';
 import { ativarDatas } from './ui/datas';
+import { aplicarSelecao, ativarSelecaoTx } from './ui/selecao';
 
 interface Tela { titulo: string | ((r: Rota) => string); render: (el: HTMLElement, r: Rota) => void; vivo?: boolean }
 
@@ -68,6 +69,7 @@ function render(anim = true) {
   $$('nav button').forEach(b => b.setAttribute('aria-current', b.dataset.aba!.split('?')[0] === r.nome ? 'page' : 'false'));
   marcarPendencias();
   try { t.render(el, r); } catch (e) { console.error(e); el.innerHTML = `<div class="panel"><div class="err">Erro ao abrir esta tela: ${(e as Error).message}</div></div>`; }
+  aplicarSelecao();
   if (anim) { el.classList.remove('anim'); void el.offsetWidth; el.classList.add('anim'); }
   // Telas que mostram o estado do serviço: relê do Android ao abrir (a permissão pode ter mudado lá fora).
   if (anim && (r.nome === 'ajustes' || r.nome === 'boasvindas')) {
@@ -124,6 +126,7 @@ async function iniciar() {
   $$('nav button').forEach(b => b.insertAdjacentHTML('afterbegin', ICONES[b.dataset.icone as keyof typeof ICONES] || ''));
   $('#btnVoltar').innerHTML = ICONES.voltar;
   ativarSelects();
+  ativarSelecaoTx();
   ativarDatas();
   await iniciarDados();
   aoMudar(() => {

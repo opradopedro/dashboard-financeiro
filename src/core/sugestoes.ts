@@ -51,3 +51,21 @@ export function possiveisReembolsos(cls: Classificada[]) {
   return cls.filter(podeSerReembolso).map(x => ({ x, cands: candidatosReembolso(cls, x, 3).filter(g => Math.abs(-g.valor - x.valor) < 0.005) }))
     .filter(r => r.cands.length);
 }
+
+/**
+ * Muda a categoria de transações respeitando o vínculo de reembolso: a categoria fica no gasto e o
+ * reembolso ligado a ele segue. Mudar no reembolso muda no gasto (e nos outros reembolsos dele).
+ * `cat` vazio = volta ao automático.
+ */
+export function definirCategoria(txs: Transacao[], ids: string[], cat: string): Transacao[] {
+  const existe = new Set(txs.map(t => t.id));
+  const porId = new Map(txs.map(t => [t.id, t]));
+  // Reembolso ligado → a categoria vai para o gasto.
+  const alvos = new Set(ids.map(id => { const r = porId.get(id)?.reembolsa; return r && existe.has(r) ? r : id; }));
+  return txs.map(t => {
+    if (alvos.has(t.id)) { const n = { ...t }; if (cat) n.cat = cat; else delete n.cat; return n; }
+    // Reembolsos desses gastos deixam de ter categoria própria: seguem a do gasto.
+    if (t.reembolsa && alvos.has(t.reembolsa) && t.cat) { const n = { ...t }; delete n.cat; return n; }
+    return t;
+  });
+}

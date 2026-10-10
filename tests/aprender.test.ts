@@ -84,3 +84,23 @@ describe('pagamento de cartão na conta', () => {
     expect(classificar([tx('Pix enviado Nomad Fintech Inc', -3500)], ctx)[0].c).toBe('Viagem');
   });
 });
+
+describe('vínculo de reembolso e categoria', () => {
+  it('mudar a categoria no reembolso muda no gasto; mudar no gasto, o reembolso segue', async () => {
+    const { definirCategoria } = await import('../src/core/sugestoes');
+    const gasto = tx('Pagamento com QR Pix DOUGLAS', -200, { cat: 'Transporte' }, '2026-09-23');
+    const reemb = tx('Pix recebido Marli', 200, { reembolsa: gasto.id, cat: 'Outras receitas' }, '2026-09-23');
+    // A categoria do vínculo é a do gasto.
+    expect(classificar([gasto, reemb], ctx)[1].c).toBe('Transporte');
+    // No reembolso: vai para o gasto (e o reembolso perde a categoria própria).
+    let ts = definirCategoria([gasto, reemb], [reemb.id], 'Compras');
+    expect(ts.map(t => t.cat)).toEqual(['Compras', undefined]);
+    expect(classificar(ts, ctx).map(x => x.c)).toEqual(['Compras', 'Compras']);
+    // No gasto: o reembolso segue.
+    ts = definirCategoria(ts, [gasto.id], 'Lazer');
+    expect(classificar(ts, ctx).map(x => x.c)).toEqual(['Lazer', 'Lazer']);
+    // Sem vínculo, só a própria muda.
+    const solta = tx('Padaria', -5);
+    expect(definirCategoria([solta, gasto], [solta.id], 'Alimentação').map(t => t.cat)).toEqual(['Alimentação', 'Transporte']);
+  });
+});

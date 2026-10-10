@@ -8,6 +8,7 @@ import type { Conta, Importacao, Mapeamento, LinhaExtrato, Transacao } from '../
 import { hoje, slug, somaMes, uid } from '../core/util';
 import { lerCsv } from '../importar/csv';
 import { checarImportacao, temAviso, type AvisoImportacao } from '../core/duplicadas';
+import { definirCategoria } from '../core/sugestoes';
 import { contaDaFonte, detectarFonte, type ArquivoLido, type Fonte } from '../importar/detectar';
 import { aplicarMapeamento, assinatura, modeloPara, sugerirMapeamento } from '../importar/mapear';
 import { lerOfx, type Ofx } from '../importar/ofx';
@@ -698,7 +699,7 @@ export function telaImportacao(el: HTMLElement, id: string) {
       <div id="impLinhas"></div>
     </section>`;
   if (minhas.length) editorLinhas(el.querySelector<HTMLElement>('#impLinhas')!, vis, selImp.sel, {
-    categoria: async (sel, c) => { await editarTxs(sel, t => { const n = { ...t }; if (c) n.cat = c; else delete n.cat; return n; }); toast('Categoria mudada.'); },
+    categoria: async (sel, c) => { await mudar(d => ({ ...d, txs: definirCategoria(d.txs, sel, c) })); toast('Categoria mudada.'); },
     tipo: async (sel, tp) => { await editarTxs(sel, t => ({ ...t, tipoUsuario: tp })); toast('Tipo mudado.'); },
     inverter: async sel => { await editarTxs(sel, t => ({ ...t, valor: -t.valor })); toast('Sinal invertido.'); },
     excluir: async sel => { await excluirTxs(sel); toast(sel.length === 1 ? 'Excluída. Reimportar o arquivo não a traz de volta.' : 'Excluídas. Reimportar o arquivo não as traz de volta.'); },
