@@ -159,7 +159,9 @@ Antes de gravar, o app pergunta se você quer continuar quando:
 - cria uma **regra** igual (mesmo app e padrão), uma **regra de categoria** com o mesmo trecho
   (substitui) ou uma **conta** com o mesmo nome. Categoria com o mesmo nome não é criada.
 
-Na lista de arquivos, o aviso já aparece em cada arquivo repetido.
+Na lista de arquivos, o aviso já aparece em cada arquivo repetido. Quando há arquivos repetidos (todas as linhas já
+importadas), a lista mostra **Importar novos** (em destaque, deixa os repetidos de fora) e
+**Importar todos** (inclui os repetidos; as linhas repetidas são puladas).
 
 ### Fatura do cartão
 Pagamento de fatura não é gasto nem entrada: cada compra já contou no dia em que foi feita. O

@@ -45,6 +45,8 @@ let lote: Sessao[] = [];
 let aberto = -1;
 let resumo: Sessao[] | null = null;
 let ocupado = false;
+let pulados: string[] = []; // repetidos deixados de fora no último "Importar novos"
+
 
 const COLS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const nomeCol = (i: number) => (i < 26 ? COLS[i] : 'A' + COLS[i - 26]);
@@ -66,7 +68,7 @@ export function telaImportar(el: HTMLElement) {
     inp.value = '';
     if (!arqs.length) return;
     // Lote novo: tira o que já foi importado ou deu erro.
-    resumo = null;
+    resumo = null; pulados = [];
     lote = lote.filter(x => !x.erro && !x.resultado);
     const p = document.getElementById('iPasso');
     if (p) p.innerHTML = `<section class="caixa"><div class="sub">Lendo ${arqs.length === 1 ? 'o arquivo' : `${arqs.length} arquivos`}…</div></section>`;
@@ -261,9 +263,12 @@ function textoAviso(a: AvisoImportacao) {
   return partes.join(' ');
 }
 
-/** Pergunta antes de importar arquivos que repetem o que já está no app. */
-async function podeImportar(ss: Sessao[]): Promise<boolean> {
-  const com = ss.map(s => ({ s, a: avisoDe(s) })).filter(x => temAviso(x.a));
+/**
+ * Pergunta antes de importar arquivos que repetem o que já está no app. `soIguais`: só pergunta
+ * pelas linhas iguais às de outro extrato (quem escolheu "Importar todos/novos" já viu o resto).
+ */
+async function podeImportar(ss: Sessao[], soIguais = false): Promise<boolean> {
+  const com = ss.map(s => ({ s, a: avisoDe(s) })).map(x => (soIguais ? { ...x, a: { ...x.a, conhecidas: 0, mesma: null } } : x)).filter(x => temAviso(x.a));
   if (!com.length) return true;
   if (com.length === 1 && ss.length === 1) {
     const a = com[0].a;
@@ -278,7 +283,7 @@ function passo() {
   if (!el) return;
   if (resumo) {
     el.innerHTML = painelResultado(resumo);
-    $('#btnNovoArq').onclick = () => { lote = []; resumo = null; aberto = -1; passo(); };
+    $('#btnNovoArq').onclick = () => { lote = []; resumo = null; pulados = []; aberto = -1; passo(); };
     return;
   }
   if (!lote.length) { el.innerHTML = ''; return; }
@@ -339,6 +344,9 @@ function infoLinhas(s: Sessao) {
 
 function passoLote(el: HTMLElement) {
   const prontas = lote.filter(pronta);
+  // Arquivos em que todas as linhas já estão no app: "Importar novos" deixa de fora.
+  const repetidos = prontas.filter(s => todasRepetidas(avisoDe(s)));
+  const novos = prontas.filter(s => !repetidos.includes(s));
   const pendentes = lote.filter(s => !s.erro && !s.resultado && !pronta(s));
   el.innerHTML = `<section class="caixa">
     <h2>${lote.length} arquivos</h2>
@@ -353,8 +361,12 @@ function passoLote(el: HTMLElement) {
       ${s.resultado ? '' : `<button type="button" class="tirar" data-tirar="${i}" aria-label="Tirar ${esc(s.arquivo)} da lista">Tirar da lista</button>`}
     </div>`).join('')}</div>
     ${pendentes.length ? `<div class="note">${pendentes.length === 1 ? 'Um arquivo precisa' : `${pendentes.length} arquivos precisam`} de conta ou de ajuste nas colunas antes de importar.</div>` : ''}
-    <div class="row"><button type="button" class="btn primary" id="btnImpLote"${prontas.length && !ocupado ? '' : ' disabled'}>${ocupado ? 'Importando…' : prontas.length === 1 ? 'Importar 1 arquivo' : `Importar ${prontas.length} arquivos`}</button>
+    <div class="row">${repetidos.length
+      ? `<button type="button" class="btn primary" id="btnImpNovos"${novos.length && !ocupado ? '' : ' disabled'}>${ocupado ? 'Importando…' : !novos.length ? 'Nenhum arquivo novo' : novos.length === 1 ? 'Importar 1 novo' : `Importar ${novos.length} novos`}</button>
+        <button type="button" class="btn" id="btnImpLote"${ocupado ? ' disabled' : ''}>Importar todos (${prontas.length})</button>`
+      : `<button type="button" class="btn primary" id="btnImpLote"${prontas.length && !ocupado ? '' : ' disabled'}>${ocupado ? 'Importando…' : prontas.length === 1 ? 'Importar 1 arquivo' : `Importar ${prontas.length} arquivos`}</button>`}
       <button type="button" class="btn" id="btnLimpar">Cancelar</button></div>
+    ${repetidos.length ? `<p class="note">${repetidos.length === 1 ? '1 arquivo já foi importado' : `${repetidos.length} arquivos já foram importados`} antes (todas as linhas). “Importar ${novos.length === 1 ? 'novo' : 'novos'}” deixa ${repetidos.length === 1 ? 'esse arquivo' : 'esses arquivos'} de fora; “Importar todos” inclui, mas as linhas repetidas são puladas.</p>` : ''}
   </section>`;
   el.querySelectorAll<HTMLSelectElement>('[data-conta]').forEach(x => (x.onchange = () => {
     const s = lote[Number(x.dataset.conta)];
@@ -366,25 +378,31 @@ function passoLote(el: HTMLElement) {
   el.querySelectorAll<HTMLButtonElement>('[data-tirar]').forEach(b => (b.onclick = () => { lote.splice(Number(b.dataset.tirar), 1); aberto = lote.length === 1 ? 0 : -1; passo(); }));
   ligarCriar(el);
   $('#btnLimpar').onclick = () => { lote = []; aberto = -1; passo(); };
-  $('#btnImpLote').onclick = async () => {
-    if (ocupado) return;
-    if (!(await podeImportar(lote.filter(pronta)))) return;
-    ocupado = true;
-    passo();
-    try {
-      for (const s of lote.filter(pronta)) {
-        if (s.tipo === 'finai') s.resultado = await importarFinai(s);
-        else {
-          s.resultado = [await importar(s.conta, linhasDe(s), s.arquivo, s.ed)];
-          if (s.tipo === 'tabela') await salvarModelo(s);
-        }
+  $('#btnImpLote').onclick = () => void importarLote(prontas, []);
+  $('#btnImpNovos')?.addEventListener('click', () => void importarLote(novos, repetidos));
+}
+
+/** Importa os arquivos escolhidos; os `deFora` (repetidos) saem da lista e entram no resumo. */
+async function importarLote(ss: Sessao[], deFora: Sessao[]) {
+  if (ocupado || !ss.length) return;
+  if (!(await podeImportar(ss, true))) return;
+  ocupado = true;
+  passo();
+  try {
+    for (const s of ss) {
+      if (s.tipo === 'finai') s.resultado = await importarFinai(s);
+      else {
+        s.resultado = [await importar(s.conta, linhasDe(s), s.arquivo, s.ed)];
+        if (s.tipo === 'tabela') await salvarModelo(s);
       }
-    } catch (err) {
-      toast(`Erro ao importar: ${(err as Error).message}`);
-    } finally { ocupado = false; }
-    if (lote.every(x => x.resultado || x.erro)) resumo = lote.filter(x => x.resultado);
-    dispatchEvent(new Event('rerender'));
-  };
+    }
+  } catch (err) {
+    toast(`Erro ao importar: ${(err as Error).message}`);
+  } finally { ocupado = false; }
+  lote = lote.filter(x => !deFora.includes(x));
+  pulados = deFora.map(x => x.arquivo);
+  if (lote.every(x => x.resultado || x.erro)) resumo = lote.filter(x => x.resultado);
+  dispatchEvent(new Event('rerender'));
 }
 
 /** Botão "Criar conta" de uma instituição sem conta no app: cria e usa em todos os arquivos dela. */
@@ -643,6 +661,7 @@ function painelResultado(ss: Sessao[]) {
     </div>
     ${ss.length > 1 ? `<div class="list">${ss.map(s => `<div class="item"><div class="name">${esc(s.arquivo)}</div><div class="val sub">${esc((s.resultado || []).map(r => nomeConta(r.conta)).join(', '))}</div>
       <div class="meta">${resumoImp(s.resultado || [])}</div></div>`).join('')}</div>` : ''}
+    ${pulados.length ? `<div class="sub">Ficaram de fora por já terem sido importados: ${esc(pulados.join(', '))}.</div>` : ''}
     <div class="sub">${t.repetidas ? `${t.repetidas} linhas já tinham sido importadas antes e foram puladas. ` : ''}“Unidas” são linhas que já existiam por notificação ou lançamento manual: o extrato prevaleceu e a origem ficou registrada.</div>
     <div class="row">${t.revisao ? '<button type="button" class="btn primary" data-ir="revisao">Revisar agora</button>' : ''}
       <button type="button" class="btn" data-ir="conferencia?conta=${encodeURIComponent(rs[0]?.conta || '')}&mes=${(rs[0]?.ate || hoje()).slice(0, 7)}">Conferência</button>

@@ -1,5 +1,6 @@
 {
   "proxima": [
+    "Ao importar vários arquivos e alguns já tiverem sido importados: botão em destaque “Importar novos” (deixa os repetidos de fora) e “Importar todos”, sem destaque.",
     "Já importados: toque e segure para marcar um ou mais arquivos e remover; botão Remover tudo; e Remover esta importação na tela do arquivo. Remover desfaz a importação: o que veio só do arquivo sai, o que já existia por notificação ou à mão continua, e dá para importar de novo depois.",
     "Todas as listas de escolha (tipo, conta, mês, avisos, colunas da importação…) abrem na folha que sobe de baixo, no mesmo visual da de categorias, com a opção atual marcada; listas longas têm busca."
   ],
