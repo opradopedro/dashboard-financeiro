@@ -175,6 +175,11 @@ Na lista de arquivos, o aviso já aparece em cada arquivo repetido. Quando há a
 importadas), a lista mostra **Importar novos** (em destaque, deixa os repetidos de fora) e
 **Importar todos** (inclui os repetidos; as linhas repetidas são puladas).
 
+### Voucher
+A categoria de entrada **Voucher** recebe sozinha todo dinheiro que entra numa conta de vale (Flash,
+Alelo, Sodexo…), como os depósitos do benefício. Se você escolher outra categoria numa dessas
+entradas, a sua escolha vale.
+
 ### Fatura do cartão
 Pagamento de fatura não é gasto nem entrada: cada compra já contou no dia em que foi feita. O
 pagamento que aparece no cartão (“Pagamento recebido”, “Pagamento de fatura”) é ligado ao Pix ou

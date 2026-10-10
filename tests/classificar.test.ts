@@ -212,3 +212,12 @@ describe('mês da fatura', () => {
     expect(mesDaFatura('2026-01-10')).toBe('2025-12');
   });
 });
+
+describe('Voucher', () => {
+  it('toda entrada numa conta de vale é Voucher; a escolha sua vence', () => {
+    const cs: Conta[] = [...contas, { id: 'flash', nome: 'Flash alimentação', banco: 'Flash', tipo: 'corrente', ativa: true }];
+    const cls = classificar([tx('flash', '2026-08-28', 'Depósito transferido', 887), tx('flash', '2026-08-28', 'Depósito transferido', 670, { cat: 'Outras receitas' }),
+      tx('mp', '2026-08-28', 'Depósito transferido', 100), tx('flash', '2026-08-29', 'Padaria', -10)], { ...ctx, contas: cs });
+    expect(cls.map(x => x.c)).toEqual(['Voucher', 'Outras receitas', '', 'Alimentação']);
+  });
+});

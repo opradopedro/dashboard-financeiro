@@ -53,7 +53,7 @@ src/
     indicadores.ts forma de pagamento, gasto por conta, ritmo do mês, dias da semana, maiores, lugares
     regras.ts      regra de notificação → transação (regex com grupos valor/desc/data)
     automatica.ts  botões Adicionar/Ignorar: gerarRegraAuto, gerarRegraIgnorar, aplicarDecisoes
-    migracoes.ts   versões dos dados (v2: Flash, regras reais); regras-v1.json = regras padrão da v1
+    migracoes.ts   versões dos dados (v2: Flash, regras reais; v3: categoria Voucher); regras-v1.json = regras padrão da v1
     ingestao.ts    fila → registro → regras → transação; reprocessar
     juntar.ts      deduplicação de extrato, revisão, conferência mensal
     duplicadas.ts  avisos antes de gravar: importação repetida, linhas iguais de outro extrato, tx igual
@@ -116,7 +116,8 @@ Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INI
   (`PAGAVEL`: Pix, transferência, boleto…). A sobra fica na conta do banco. `mesDaFatura(data)` =
   mês de 15 dias antes do pagamento (pago dia 5 = fatura do mês anterior); o Painel mostra as faturas
   nesse mês.
-- Categoria: `cat` > regra de categoria > palavras-chave (trecho mais longo vence; entrada só em
+- Categoria: `cat` > regra de categoria > entrada em conta de vale = `CAT_VOUCHER` ("Voucher") >
+  palavras-chave (trecho mais longo vence; entrada só em
   categoria de receita) > sem categoria (`''`, exibido “Sem categoria”).
 - Painel conta só `entrada` e `saida`. Estorno no cartão = `saida` com valor positivo.
 

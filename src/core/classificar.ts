@@ -3,6 +3,7 @@
 // da fatura) e em que categoria cada gasto cai. Funções puras, testadas em tests/classificar.test.ts.
 import type { Categoria, Conta, RegraCat, TipoTx, Transacao } from './tipos';
 import { diasEntre, norm, somaDias } from './util';
+import { CAT_VOUCHER } from './padroes';
 
 const CAIXINHA = / (caixinhas?|cofrinhos?|cofre|dinheiro reservado|dinheiro retirado|reservado|reserva por|retirada da reserva|guardado|porquinho|aplicacao|aplic|resgate|cdb|lci|lca|tesouro direto|investimento|fundo de investimento|previdencia) /;
 const FATURA = / (pagamento (da |de )?fatura|pagto fatura|pgto fatura|pagamento cartao|pagamento de cartao|fatura cartao|pagamento recebido|pagamento efetuado|credit card payment) /;
@@ -88,6 +89,8 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
   const tipoConta = new Map(ctx.contas.map(c => [c.id, c.tipo]));
   const regras = ctx.regrasCat.map(r => ({ ...r, t: ` ${r.termo} ` }));
   const catPorPalavra = indicePalavras(ctx.categorias);
+  const vale = new Set(ctx.contas.filter(c => ehContaVale(c)).map(c => c.id));
+  const temVoucher = ctx.categorias.some(c => c.nome === CAT_VOUCHER && c.receita);
 
   const out: Classificada[] = txs.map(tx => {
     const cartao = tipoConta.get(tx.conta) === 'cartao';
@@ -98,6 +101,8 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
     for (const r of regras) if (d.includes(r.t)) { if (r.tipo) { t = r.tipo; auto = false; } if (r.cat) c = r.cat; }
     if (tx.tipoUsuario) { t = tx.tipoUsuario; auto = false; }
     if (tx.cat) c = tx.cat;
+    // Dinheiro que entra numa conta de vale é o crédito do benefício: categoria Voucher.
+    if (c == null && t === 'entrada' && vale.has(tx.conta) && temVoucher) c = CAT_VOUCHER;
     if (c == null) c = catPorPalavra(tx.desc, t === 'entrada') ?? '';
     return { ...tx, t, c, auto };
   });
@@ -123,7 +128,6 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
   const bancoDe = new Map(ctx.contas.map(c => [c.id, norm(c.banco).trim()]));
   // Só o que é pagamento de fatura no cartão ("Pagamento recebido", regra, sua escolha). Crédito
   // qualquer no cartão é estorno, não pagamento.
-  const vale = new Set(ctx.contas.filter(c => ehContaVale(c)).map(c => c.id));
   const pagamentos = out.filter(x => ehCartao(x) && x.t === 'fatura').sort((a, b) => a.data.localeCompare(b.data));
   const antes = (cc: Classificada, x: Classificada) => (Date.parse(cc.data) - Date.parse(x.data)) / 864e5;
   const podePagar = (cc: Classificada, x: Classificada) => !usados.has(x) && !ehCartao(x) && !vale.has(x.conta) && x.valor < 0

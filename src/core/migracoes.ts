@@ -1,7 +1,7 @@
 // Migrações dos dados guardados no aparelho (e de backups antigos). Cada versão só acrescenta:
 // nunca apaga o que você criou nem desfaz o que você editou.
 import type { Dados } from './tipos';
-import { APPS_INICIAIS, CATEGORIAS_INICIAIS, CONTAS_INICIAIS, REGRAS_INICIAIS, VERSAO_DADOS } from './padroes';
+import { APPS_INICIAIS, CAT_VOUCHER, CATEGORIAS_INICIAIS, CONTAS_INICIAIS, REGRAS_INICIAIS, VERSAO_DADOS } from './padroes';
 import { reprocessar } from './ingestao';
 import REGRAS_V1 from './regras-v1.json';
 
@@ -32,7 +32,18 @@ function v2(d: Dados): Dados {
   return { ...d, contas, apps, regras, categorias: cats };
 }
 
-const PASSOS: [number, (d: Dados) => Dados][] = [[2, v2]];
+/** v2 → v3: categoria de entrada Voucher (crédito do vale). */
+function v3(d: Dados): Dados {
+  if (d.categorias.some(c => c.nome === CAT_VOUCHER)) return d;
+  const voucher = CATEGORIAS_INICIAIS.find(c => c.nome === CAT_VOUCHER)!;
+  // Entra depois de "Rendimentos" (ou no fim), junto das outras categorias de entrada.
+  const i = d.categorias.findIndex(c => c.nome === 'Rendimentos');
+  const categorias = [...d.categorias];
+  categorias.splice(i >= 0 ? i + 1 : categorias.length, 0, { ...voucher, palavras: [...voucher.palavras] });
+  return { ...d, categorias };
+}
+
+const PASSOS: [number, (d: Dados) => Dados][] = [[2, v2], [3, v3]];
 
 /** Leva os dados até a versão atual. Depois de migrar, as notificações sem regra são reprocessadas. */
 export function migrar(d: Dados): { dados: Dados; migrou: boolean } {

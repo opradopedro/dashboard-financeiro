@@ -20,6 +20,9 @@ export const APPS_INICIAIS: AppMonitorado[] = [
 
 // Categorização automática por palavras (vinda do carteira). Vence a palavra mais longa encontrada.
 const g = (nome: string, palavras: string): Categoria => ({ nome, receita: false, palavras: palavras.split(',').map(s => s.trim()).filter(Boolean) });
+/** Categoria de entrada do vale-refeição/alimentação. */
+export const CAT_VOUCHER = 'Voucher';
+
 const r = (nome: string, palavras: string): Categoria => ({ ...g(nome, palavras), receita: true });
 
 export const CATEGORIAS_INICIAIS: Categoria[] = [
@@ -44,6 +47,8 @@ export const CATEGORIAS_INICIAIS: Categoria[] = [
   g('Outros', ''),
   r('Salário', 'salario, folha de pagamento, pagamento de salario, proventos salario, adiantamento salarial'),
   r('Rendimentos', 'rendimento, rendimentos, juros sobre capital, dividendo, remuneracao'),
+  // Crédito do vale (Flash, Alelo…): toda entrada numa conta de vale cai aqui (classificar.ts).
+  r(CAT_VOUCHER, 'recarga de beneficio, credito de beneficio'),
   r('Outras receitas', ''),
 ];
 
@@ -118,7 +123,7 @@ export const REGRAS_INICIAIS: RegraNotif[] = ([
 ] as Base[]).map(regra);
 
 /** Versão atual dos dados (ver migracoes.ts). */
-export const VERSAO_DADOS = 2;
+export const VERSAO_DADOS = 3;
 
 export function dadosIniciais(): Dados {
   return {

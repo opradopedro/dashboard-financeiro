@@ -1,5 +1,7 @@
 {
-  "proxima": [],
+  "proxima": [
+    "Nova categoria de entrada Voucher: todo dinheiro que entra na Flash (ou outra conta de vale) cai nela sozinho, inclusive o que já estava no app."
+  ],
   "versoes": [
     {
       "versao": "1.8",
