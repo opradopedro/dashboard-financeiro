@@ -110,27 +110,97 @@ export function escolherCategoria(atual: string, op: Opcoes = {}): Promise<strin
   });
 }
 
-/** Folha com uma lista curta de opções (sem busca). Devolve o valor escolhido ou null. */
-export function escolherOpcao(titulo: string, opcoes: { v: string; t: string; nota?: string }[]): Promise<string | null> {
+export interface OpcaoLista { v: string; t: string; nota?: string; desativada?: boolean }
+
+/**
+ * Folha com uma lista de opções (a atual marcada). Com muitas opções, ganha busca.
+ * Devolve o valor escolhido ou null se fechou sem escolher.
+ */
+export function escolherOpcao(titulo: string, opcoes: OpcaoLista[], atual?: string): Promise<string | null> {
   return new Promise(resolve => {
     let escolhido: string | null = null;
+    const comBusca = opcoes.length > 8;
     const dlg = document.createElement('dialog');
     dlg.className = 'folha-sel';
-    dlg.setAttribute('aria-label', titulo);
-    dlg.innerHTML = `<div class="folha-sel-cab"><h2 class="folha-sel-titulo">${esc(titulo)}</h2><button type="button" class="btn small" id="selFechar">Fechar</button></div>
-      <div class="folha-sel-lista">${opcoes.map(o => `<button type="button" class="sel-op" data-v="${esc(o.v)}"><span>${esc(o.t)}${o.nota ? `<small>${esc(o.nota)}</small>` : ''}</span></button>`).join('')}</div>`;
+    dlg.setAttribute('aria-label', titulo || 'Escolher');
+    dlg.innerHTML = `<div class="folha-sel-cab">${comBusca
+        ? `<input type="search" id="selBusca" placeholder="${esc(titulo ? `Buscar ${titulo.toLowerCase()}` : 'Buscar')}" autocomplete="off" aria-label="Buscar">`
+        : `<h2 class="folha-sel-titulo">${esc(titulo)}</h2>`}
+        <button type="button" class="btn small" id="selFechar">Fechar</button></div>
+      <div class="folha-sel-lista" role="listbox"></div>`;
     document.body.appendChild(dlg);
-    dlg.querySelector<HTMLElement>('.folha-sel-lista')!.onclick = e => {
+    const lista = dlg.querySelector<HTMLElement>('.folha-sel-lista')!;
+    const busca = dlg.querySelector<HTMLInputElement>('#selBusca');
+    const desenhar = () => {
+      const q = norm(busca?.value || '').trim();
+      const vis = opcoes.filter(o => !q || norm(o.t + ' ' + (o.nota || '')).includes(q));
+      lista.innerHTML = vis.map(o => `<button type="button" class="sel-op${o.v === atual ? ' atual' : ''}" data-v="${esc(o.v)}" role="option" aria-selected="${o.v === atual}"${o.desativada ? ' disabled' : ''}>
+        <span>${esc(o.t)}${o.nota ? `<small>${esc(o.nota)}</small>` : ''}</span>${o.v === atual ? ICONE_OK : ''}</button>`).join('')
+        || '<p class="sel-nada">Nada com esse nome.</p>';
+    };
+    lista.onclick = e => {
       const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
-      if (!b) return;
+      if (!b || b.disabled) return;
       escolhido = b.dataset.v ?? null;
       dlg.close();
     };
+    if (busca) {
+      busca.oninput = desenhar;
+      busca.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); lista.querySelector<HTMLButtonElement>('.sel-op:not([disabled])')?.click(); } };
+    }
     (dlg.querySelector('#selFechar') as HTMLButtonElement).onclick = () => dlg.close();
     dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
     dlg.addEventListener('close', () => { dlg.remove(); resolve(escolhido); });
+    desenhar();
     dlg.showModal();
+    // Sem busca, o foco vai para a opção atual (o teclado não abre à toa).
+    if (!busca) (lista.querySelector<HTMLButtonElement>('.atual') || lista.querySelector<HTMLButtonElement>('.sel-op'))?.focus();
+    lista.querySelector('.atual')?.scrollIntoView({ block: 'center' });
   });
+}
+
+/** Título da folha para um <select>: o rótulo ligado a ele, ou o aria-label. */
+function tituloDe(sel: HTMLSelectElement) {
+  const lab = sel.id ? document.querySelector<HTMLLabelElement>(`label[for="${sel.id}"]`) : null;
+  return (lab?.textContent || sel.getAttribute('aria-label') || '').trim();
+}
+
+/** Abre a folha no lugar da lista do Android e devolve a escolha ao <select> (com evento change). */
+async function abrirSelect(sel: HTMLSelectElement) {
+  const opcoes = Array.from(sel.options).map(o => ({ v: o.value, t: o.text, desativada: o.disabled }));
+  const v = await escolherOpcao(tituloDe(sel), opcoes, sel.value);
+  if (v === null || v === sel.value) return;
+  sel.value = v;
+  sel.dispatchEvent(new Event('input', { bubbles: true }));
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
+ * Todas as listas (<select>) do app abrem na folha que sobe de baixo, no visual do app, em vez da
+ * lista do Android. Os <select> não recebem toque (pointer-events: none no CSS), então a lista do
+ * sistema nunca abre; o toque é achado pela posição.
+ */
+export function ativarSelects() {
+  document.addEventListener('click', e => {
+    if (e.clientX === 0 && e.clientY === 0) return; // clique feito por código (ex.: .click())
+    const aberto = document.querySelector('dialog[open]');
+    const alvo = Array.from(document.querySelectorAll<HTMLSelectElement>('select:not([multiple]):not([disabled])')).find(s => {
+      if (aberto && !aberto.contains(s)) return false;
+      const r = s.getBoundingClientRect();
+      return r.width > 0 && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    });
+    if (!alvo) return;
+    e.preventDefault();
+    e.stopPropagation();
+    void abrirSelect(alvo);
+  }, true);
+  // Teclado (ou leitor de tela): Enter, espaço ou seta abrem a folha.
+  document.addEventListener('keydown', e => {
+    const s = e.target;
+    if (!(s instanceof HTMLSelectElement) || s.multiple || !['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+    e.preventDefault();
+    void abrirSelect(s);
+  }, true);
 }
 
 /**

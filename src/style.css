@@ -287,3 +287,6 @@ dialog.folha-sel::backdrop{background:rgba(6,9,15,.62)}
 .confirma-corpo .row{margin-top:6px}
 .repetido{display:flex;gap:9px;font-size:13px;line-height:1.5;color:var(--grafite-claro)}
 .repetido::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--alerta);flex:none;margin-top:7px}
+/* Listas: o toque é tratado pelo app (folha que sobe de baixo), nunca pela lista do Android. */
+select:not([multiple]){pointer-events:none}
+.field:has(> select){cursor:pointer}

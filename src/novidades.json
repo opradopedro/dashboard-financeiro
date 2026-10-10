@@ -1,5 +1,7 @@
 {
-  "proxima": [],
+  "proxima": [
+    "Todas as listas de escolha (tipo, conta, mês, avisos, colunas da importação…) abrem na folha que sobe de baixo, no mesmo visual da de categorias, com a opção atual marcada; listas longas têm busca."
+  ],
   "versoes": [
     {
       "versao": "1.7",
