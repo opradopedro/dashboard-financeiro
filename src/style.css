@@ -256,6 +256,8 @@ dialog.folha-sel::backdrop{background:rgba(6,9,15,.62)}
 /* ---------- painel: indicadores ---------- */
 .rosca{display:flex;justify-content:center;padding:4px 0}
 .rosca svg{max-width:100%;height:auto;overflow:visible}
+.rosca .parte{transition:transform .12s,opacity .12s}
+.rosca .parte:active{transform:translateY(-3px);opacity:.85}
 .caixa .rosca{--fundo-rosca:var(--lousa)}
 .parte{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .15s}
 .parte:active{opacity:.7}

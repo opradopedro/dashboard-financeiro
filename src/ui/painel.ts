@@ -41,11 +41,10 @@ interface Parte { rotulo: string; v: number; n: number; cor: string; ir: string 
  * Rosca (ou pizza) + lista: cada fatia e cada linha abrem o detalhe daquela parte.
  * `unidade` = singular e plural do que é contado (gasto/gastos, entrada/entradas).
  */
-function blocoPartes(ps: Parte[], total: number, opc: { centro?: string; pizza?: boolean; unidade: [string, string] }) {
+function blocoPartes(ps: Parte[], total: number, opc: { pizza?: boolean; unidade: [string, string] }) {
   if (!ps.length) return '';
   const maior = ps[0].v || 1;
-  const grafico = rosca(ps.map(p => ({ v: p.v, cor: p.cor, rotulo: p.rotulo, ir: p.ir })),
-    opc.pizza ? undefined : { valor: brl(total), legenda: opc.centro || '' }, opc.pizza ? { furo: 0, tam: 168 } : {});
+  const grafico = rosca(ps.map(p => ({ v: p.v, cor: p.cor, rotulo: p.rotulo, ir: p.ir })), opc.pizza ? { furo: 0, larg: 250 } : {});
   return `${grafico}<div class="folha"><div class="list">${ps.map(p => `<button type="button" class="item cat-linha" data-ir="${esc(p.ir)}">
       <div class="name">${esc(p.rotulo)}</div><div class="val">${brl(p.v)}</div>
       <div class="barra"><i style="width:${Math.max(2, p.v / maior * 100).toFixed(1)}%;background:${p.cor}"></i></div>
@@ -218,7 +217,7 @@ export function telaPainel(el: HTMLElement) {
 
   <section class="panel">
     <div class="row between"><h2>Para onde foi</h2><span class="sub">${brl(r.saidas)}</span></div>
-    ${r.porCategoria.length ? blocoPartes(partesCat(r.porCategoria, irCat), r.saidas, { centro: 'gastos', unidade: ['transação', 'transações'] }) : '<div class="empty">Nenhum gasto neste mês.</div>'}
+    ${r.porCategoria.length ? blocoPartes(partesCat(r.porCategoria, irCat), r.saidas, { unidade: ['transação', 'transações'] }) : '<div class="empty">Nenhum gasto neste mês.</div>'}
     ${r.semCategoria ? `<button type="button" class="btn small" data-ir="semcat/${mes}">Categorizar ${r.semCategoria === 1 ? '1 transação' : `${r.semCategoria} transações`}</button>` : ''}
   </section>
 
@@ -261,7 +260,7 @@ export function telaPainel(el: HTMLElement) {
   </section>` : ''}
 
   ${r.entradasPorCategoria.length ? `<section class="panel"><div class="row between"><h2>De onde veio</h2><span class="sub">${brl(r.entradas)}</span></div>
-    ${blocoPartes(partesCat(r.entradasPorCategoria, irCat), r.entradas, { centro: 'entradas', unidade: ['entrada', 'entradas'] })}</section>` : ''}
+    ${blocoPartes(partesCat(r.entradasPorCategoria, irCat), r.entradas, { unidade: ['entrada', 'entradas'] })}</section>` : ''}
 
   <section class="panel">
     <h2>Últimos 12 meses</h2>
@@ -361,8 +360,8 @@ export function telaMovimentos(el: HTMLElement, tipo: string) {
     <p class="frase">${xs.length ? `${ent ? 'Entrou' : 'Saiu'} <b>${brl(total)}</b> em ${xs.length === 1 ? (ent ? '1 entrada' : '1 gasto') : `${xs.length} ${ent ? 'entradas' : 'gastos'}`}.` : `Nenhuma ${ent ? 'entrada' : 'saída'} neste mês.`}</p>
     ${estornos ? `<p class="sub">Inclui ${estornos === 1 ? '1 estorno' : `${estornos} estornos`}, que descontam do total.</p>` : ''}
   </section>
-  ${cats.length ? `<section class="panel"><h2>Por categoria</h2>
-    ${blocoPartes(partesCat(cats, irCat), ent ? rm.entradas : rm.saidas, { centro: ent ? 'entradas' : 'gastos', unidade: ent ? ['entrada', 'entradas'] : ['transação', 'transações'] })}</section>` : ''}
+  ${cats.length ? `<section class="panel"><div class="row between"><h2>Por categoria</h2><span class="sub">${brl(ent ? rm.entradas : rm.saidas)}</span></div>
+    ${blocoPartes(partesCat(cats, irCat), ent ? rm.entradas : rm.saidas, { unidade: ent ? ['entrada', 'entradas'] : ['transação', 'transações'] })}</section>` : ''}
   ${xs.length ? `<section class="panel"><h2>${ent ? 'Entradas' : 'Saídas'} do mês</h2><div class="folha"><div class="list">${listaPorDia(xs)}</div></div>
     <p class="note">Caixinha, transferências entre suas contas e pagamento de fatura não aparecem aqui: são dinheiro seu mudando de lugar.</p></section>` : ''}`;
   el.querySelectorAll<HTMLButtonElement>('[data-trocar]').forEach(b => (b.onclick = () => trocar(`movimentos/${b.dataset.trocar}`)));
@@ -393,15 +392,15 @@ export function telaDetalhe(el: HTMLElement, rec: Recorte, nome = '') {
   const secoes: string[] = [];
   const secao = (h: string, total: number, corpo: string) => corpo && secoes.push(`<section class="panel"><div class="row between"><h2>${h}</h2><span class="sub">${brl(total)}</span></div>${corpo}</section>`);
   if (rec.cat == null && r.porCategoria.length)
-    secao('Por categoria', r.saidas, blocoPartes(partesCat(r.porCategoria, c => com({ cat: c })), r.saidas, { centro: 'gastos', unidade: ['gasto', 'gastos'] }));
+    secao('Por categoria', r.saidas, blocoPartes(partesCat(r.porCategoria, c => com({ cat: c })), r.saidas, { unidade: ['gasto', 'gastos'] }));
   const formas = porForma(sub, d.contas, mes);
   if (!rec.forma && formas.length > 1)
     secao('Como pagou', r.saidas, blocoPartes(partesForma(formas, f => com({ forma: f })), r.saidas, { pizza: true, unidade: ['gasto', 'gastos'] }));
   const contas = porConta(sub, mes);
   if (!rec.conta && contas.length > 1)
-    secao('Por conta', r.saidas, blocoPartes(partesConta(contas, c => com({ conta: c })), r.saidas, { centro: 'gastos', unidade: ['gasto', 'gastos'] }));
+    secao('Por conta', r.saidas, blocoPartes(partesConta(contas, c => com({ conta: c })), r.saidas, { unidade: ['gasto', 'gastos'] }));
   if (rec.cat == null && r.entradasPorCategoria.length)
-    secao('De onde veio', r.entradas, blocoPartes(partesCat(r.entradasPorCategoria, c => com({ cat: c })), r.entradas, { centro: 'entradas', unidade: ['entrada', 'entradas'] }));
+    secao('De onde veio', r.entradas, blocoPartes(partesCat(r.entradasPorCategoria, c => com({ cat: c })), r.entradas, { unidade: ['entrada', 'entradas'] }));
   if (rec.lugar == null && !rec.forma && !rec.conta && rec.dia == null) {
     // Categoria: onde mais gastou nela.
     const onde = lugares(sub, mes, 5).filter(l => l.n > 0);

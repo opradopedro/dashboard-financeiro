@@ -70,7 +70,7 @@ src/
   nativo/notificacoes.ts  ponte com o plugin Kotlin (+ imitação para navegador)
   app.ts           estado, mudar() (fila de gravações), consumirFila(), classificadas() com cache
   ui/              telas (strings HTML + eventos), nav.ts (rotas por hash), fmt.ts, graficos.ts (SVG; rosca()
-                   com fatias data-ir), painel.ts (telaDetalhe: rota detalhe?forma=&conta=&lugar=&dia=&cat=; cat/<nome>),
+                   em 3D, com fatias data-ir e % na fatia), painel.ts (telaDetalhe: rota detalhe?forma=&conta=&lugar=&dia=&cat=; cat/<nome>),
                    escolher.ts (folhas: categoria com busca, opção, confirmar), datas.ts, reembolsos.ts (bloco na transação, lista), filtro.ts (filtro em uso na memória,
                    clsFiltradas, folha, Filtros salvos), novidades.ts, avancado.ts (filtro das notificações + registro)
   novidades.json   histórico de versões + `proxima` (pendentes); gera as notas da Release

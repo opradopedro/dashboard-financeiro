@@ -64,35 +64,69 @@ export function graficoSemana(el: HTMLElement, s: number[], ir?: (dia: number) =
 
 export interface Parte { v: number; cor: string; rotulo: string; ir?: string }
 
+let seqGrafico = 0;
+
 /**
- * Rosca (ou pizza, com furo = 0): cada parte é tocável e abre o detalhe dela (data-ir). No meio
- * da rosca, o total e uma legenda curta. Partes pequenas ganham um mínimo para dar para tocar.
+ * Rosca (ou pizza, com furo = 0) em 3D: disco inclinado com parede, sombra e brilho; a
+ * porcentagem vai escrita na fatia (o 3D engana o tamanho, o número não). Cada fatia (topo e
+ * parede) é tocável e abre o detalhe dela (data-ir). Partes pequenas ganham um mínimo para dar
+ * para tocar. Ângulo 0 = fundo do disco (meio-dia), no sentido do relógio.
  */
-export function rosca(partes: Parte[], centro?: { valor: string; legenda: string }, opc: { tam?: number; furo?: number } = {}) {
+export function rosca(partes: Parte[], opc: { larg?: number; furo?: number } = {}) {
   const ps = partes.filter(p => p.v > 0.005);
   const total = ps.reduce((a, p) => a + p.v, 0);
   if (total <= 0) return '';
-  const tam = opc.tam ?? 200, furo = opc.furo ?? 0.62;
-  const c = tam / 2, R = c - 2, r = R * furo;
-  // Mínimo de 2% do círculo por parte (o resto encolhe para caber).
+  const W = opc.larg ?? 280, furo = opc.furo ?? 0.5;
+  const R = W / 2 - 6, k = 0.58, ry = R * k, h = R * 0.17, r = R * furo;
+  const cx = W / 2, cy = ry + 6, H = Math.ceil(cy + ry + h + 12);
+  const id = `g3d${++seqGrafico}`;
+  const P = (raio: number, a: number, dy = 0) => `${(cx + raio * Math.sin(a)).toFixed(2)},${(cy - raio * Math.cos(a) * k + dy).toFixed(2)}`;
+  const arco = (raio: number, a0: number, a1: number, dy = 0, volta = false) =>
+    `A${raio.toFixed(2)},${(raio * k).toFixed(2)} 0 ${Math.abs(a1 - a0) > Math.PI ? 1 : 0} ${volta ? 0 : 1} ${P(raio, volta ? a0 : a1, dy)}`;
+  // Topo da fatia (anel ou cunha).
+  const topo = (a0: number, a1: number) => r > 0
+    ? `M${P(R, a0)}${arco(R, a0, a1)}L${P(r, a1)}${arco(r, a0, a1, 0, true)}z`
+    : `M${cx},${cy}L${P(R, a0)}${arco(R, a0, a1)}z`;
+  // Parede: faixa entre o arco de cima e o mesmo arco h mais abaixo, só no trecho visível.
+  const parede = (raio: number, a0: number, a1: number, de: number, ate: number) => {
+    const b0 = Math.max(a0, de), b1 = Math.min(a1, ate);
+    return b1 - b0 > 0.001 ? `M${P(raio, b0)}${arco(raio, b0, b1)}L${P(raio, b1, h)}${arco(raio, b0, b1, h, true)}z` : '';
+  };
   const min = 0.02, peq = ps.filter(p => p.v / total < min).length;
   const escalaG = peq ? (1 - peq * min) / ps.filter(p => p.v / total >= min).reduce((a, p) => a + p.v / total, 0) : 1;
-  const ponto = (raio: number, a: number) => `${(c + raio * Math.sin(a)).toFixed(2)},${(c - raio * Math.cos(a)).toFixed(2)}`;
-  const fatia = (a0: number, a1: number) => {
-    const grande = a1 - a0 > Math.PI ? 1 : 0;
-    if (r <= 0) return `M${c},${c}L${ponto(R, a0)}A${R},${R} 0 ${grande} 1 ${ponto(R, a1)}z`;
-    return `M${ponto(R, a0)}A${R},${R} 0 ${grande} 1 ${ponto(R, a1)}L${ponto(r, a1)}A${r},${r} 0 ${grande} 0 ${ponto(r, a0)}z`;
-  };
-  let a = 0, g = '';
+  const sep = ps.length > 1 ? 'stroke="var(--fundo-rosca, var(--noite))" stroke-width="1.5" stroke-linejoin="round"' : '';
+  let a = 0, fatias = '', rotulos = '';
   for (const p of ps) {
-    const f = p.v / total, da = 2 * Math.PI * (f < min ? min : f * escalaG);
-    // Uma parte só: círculo inteiro em duas metades (o arco SVG não fecha sozinho).
-    const d = ps.length === 1 ? fatia(0, Math.PI) + fatia(Math.PI, 2 * Math.PI) : fatia(a, a + da);
+    const f = p.v / total, da = 2 * Math.PI * (f < min ? min : f * escalaG), a1 = a + da;
+    // A parede de fora aparece na metade da frente (90° a 270°); a de dentro, no fundo do furo.
+    const fora = parede(R, a, a1, Math.PI / 2, 1.5 * Math.PI);
+    const dentro = r > 0 ? parede(r, a, a1, 0, Math.PI / 2) + parede(r, a, a1, 1.5 * Math.PI, 2 * Math.PI) : '';
+    const sup = ps.length === 1 ? topo(0, Math.PI) + topo(Math.PI, 2 * Math.PI) : topo(a, a1);
     const titulo = `${p.rotulo}: ${brl(p.v)} (${Math.round(f * 100)}%)`;
-    g += `<path d="${d}" fill="${p.cor}" stroke="var(--fundo-rosca, var(--noite))" stroke-width="${ps.length === 1 ? 0 : 2}" stroke-linejoin="round"${p.ir ? ` data-ir="${p.ir}" class="parte"` : ''}><title>${esc(titulo)}</title></path>`;
-    a += da;
+    fatias += `<g${p.ir ? ` data-ir="${esc(p.ir)}" class="parte"` : ''}><title>${esc(titulo)}</title>`
+      + (dentro ? `<path d="${dentro}" fill="${p.cor}"/><path d="${dentro}" fill="#000" opacity=".5"/>` : '')
+      + (fora ? `<path d="${fora}" fill="${p.cor}" ${sep}/><path d="${fora}" fill="#000" opacity=".3"/>` : '')
+      + `<path d="${sup}" fill="${p.cor}" ${sep}/></g>`;
+    if (f >= 0.05) {
+      const m = a + da / 2, rr = r > 0 ? (R + r) / 2 : R * 0.64;
+      rotulos += `<text x="${(cx + rr * Math.sin(m)).toFixed(1)}" y="${(cy - rr * Math.cos(m) * k + 4).toFixed(1)}" text-anchor="middle" font-size="12.5" font-weight="650" fill="#fff" stroke="rgba(8,12,20,.55)" stroke-width="3" paint-order="stroke" stroke-linejoin="round">${Math.round(f * 100)}%</text>`;
+    }
+    a = a1;
   }
-  const meio = centro && r > 0 ? `<text x="${c}" y="${c - 2}" text-anchor="middle" pointer-events="none" font-size="${(tam / 13).toFixed(1)}" font-weight="500" fill="var(--papel)">${esc(centro.valor)}</text>
-    <text x="${c}" y="${c + tam / 11}" text-anchor="middle" pointer-events="none" font-size="${(tam / 17).toFixed(1)}" fill="var(--grafite)">${esc(centro.legenda)}</text>` : '';
-  return `<div class="rosca"><svg viewBox="0 0 ${tam} ${tam}" width="${tam}" height="${tam}" role="img" aria-label="${esc(ps.map(p => `${p.rotulo} ${brl(p.v)}`).join(', '))}" font-family="inherit">${g}${meio}</svg></div>`;
+  // Furo e brilho só no topo (evenodd recorta o furo).
+  const disco = `M${cx - R},${cy}a${R},${ry} 0 1 0 ${2 * R},0a${R},${ry} 0 1 0 ${-2 * R},0z`
+    + (r > 0 ? `M${cx - r},${cy}a${r},${r * k} 0 1 0 ${2 * r},0a${r},${r * k} 0 1 0 ${-2 * r},0z` : '');
+  const faixa = `M${cx - R},${cy}A${R},${ry} 0 0 0 ${cx + R},${cy}L${cx + R},${cy + h}A${R},${ry} 0 0 1 ${cx - R},${cy + h}z`;
+  return `<div class="rosca"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(ps.map(p => `${p.rotulo} ${brl(p.v)}`).join(', '))}" font-family="inherit">
+    <defs>
+      <radialGradient id="${id}s"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${id}b" cx=".35" cy=".2" r=".85"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".6" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+      <linearGradient id="${id}p"><stop offset="0" stop-color="#000" stop-opacity=".35"/><stop offset=".45" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#000" stop-opacity=".4"/></linearGradient>
+    </defs>
+    <ellipse cx="${cx}" cy="${(cy + h + 3).toFixed(1)}" rx="${(R * 1.04).toFixed(1)}" ry="${(ry * 1.08).toFixed(1)}" fill="url(#${id}s)"/>
+    ${fatias}
+    <path d="${faixa}" fill="url(#${id}p)" pointer-events="none"/>
+    <path d="${disco}" fill="url(#${id}b)" fill-rule="evenodd" pointer-events="none"/>
+    <g pointer-events="none">${rotulos}</g>
+  </svg></div>`;
 }

@@ -48,7 +48,8 @@ e as contas. **Não contam** como entrada nem saída: caixinha/reserva, Pix e tr
 suas contas, e pagamento de fatura. Compra no crédito conta como gasto **na data da compra**.
 Estorno no cartão desconta do gasto.
 
-Tudo é tocável e abre o **detalhe** daquilo: fatias das roscas (para onde foi, de onde veio),
+As roscas e pizzas são em 3D, com a porcentagem escrita em cada fatia (o 3D engana o
+tamanho; o número e a lista embaixo não). Tudo é tocável e abre o **detalhe** daquilo: fatias das roscas (para onde foi, de onde veio),
 a pizza de **como pagou** (Pix, crédito, vale…), lugares de **onde mais gastou**, barras dos
 **dias da semana**, **contas** e os meses do gráfico de 12 meses (abre o mês). O detalhe mostra o
 total do mês, a média dos 11 meses anteriores, as divisões que ainda fazem sentido (por categoria,
