@@ -20,7 +20,8 @@ export const arred = (v: number) => Math.round(v * 100) / 100;
  */
 export function parseValor(v: unknown): number {
   if (typeof v === 'number') return v;
-  let s = String(v ?? '').trim().replace(/ /g, ' ');
+  // Sinal de menos tipográfico (−, –) vira hífen; espaços especiais viram espaço comum.
+  let s = String(v ?? '').trim().replace(/[\u00a0\u2007\u202f]/g, ' ').replace(/[\u2212\u2013\u2012]/g, '-');
   if (!s) return NaN;
   let neg = false;
   if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }

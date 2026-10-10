@@ -100,3 +100,21 @@ DATA:OFXSGML
   });
   it('arquivo que não é OFX', () => expect(() => lerOfx('a;b')).toThrow());
 });
+
+describe('codificação e sinais do arquivo', () => {
+  const csv = 'Data,Hora,Movimentação,Valor,Meio de Pagamento,Saldo\n09/10/2026,13:41,CAFE EXEMPLO,"-R$ 32,00",Cartão,"R$ 941,31"\n';
+  const linhas = (b: Buffer) => {
+    const rows = lerCsv(decodificar(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer));
+    return aplicarMapeamento(rows, sugerirMapeamento(rows)).linhas;
+  };
+  it('UTF-16 com e sem marca (BOM), little e big endian', () => {
+    const le = Buffer.from(csv, 'utf16le');
+    const be = Buffer.from(le); for (let i = 0; i < be.length; i += 2) [be[i], be[i + 1]] = [be[i + 1], be[i]];
+    for (const b of [Buffer.concat([Buffer.from([0xff, 0xfe]), le]), le, Buffer.concat([Buffer.from([0xfe, 0xff]), be]), be])
+      expect(linhas(b).map(l => [l.data, l.valor, l.desc])).toEqual([['2026-10-09', -32, 'CAFE EXEMPLO']]);
+  });
+  it('sinal de menos tipográfico e espaço não separável', () => {
+    expect(parseValor('−R$ 32,00')).toBe(-32);
+    expect(parseValor('–15,50')).toBe(-15.5);
+  });
+});

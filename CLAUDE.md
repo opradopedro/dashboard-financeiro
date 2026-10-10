@@ -63,7 +63,8 @@ src/
     finai.ts       exportar/ler finai-banco/1
     backup.ts      backup/restauração e sanear() (valida dados do banco local e de backups)
   importar/        detectar.ts (banco/conta do arquivo: modelo salvo > formato > nome), csv.ts, ofx.ts, pdf.ts (pdf.js; tabela Data/Descrição/ID/Valor/Saldo), planilha.ts
-                   (SheetJS sob demanda), mapear.ts (inclui saldo e parcela), texto.ts
+                   (SheetJS sob demanda), mapear.ts (inclui saldo e parcela), texto.ts (UTF-16 com/sem BOM,
+                   UTF-8, Windows-1252)
   dados/db.ts      IndexedDB: um registro 'dados' com tudo, gravado inteiro a cada mudança
   nativo/notificacoes.ts  ponte com o plugin Kotlin (+ imitação para navegador)
   app.ts           estado, mudar() (fila de gravações), consumirFila(), classificadas() com cache

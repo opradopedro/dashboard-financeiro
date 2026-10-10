@@ -440,7 +440,19 @@ function ligarCabecalho(el: HTMLElement, s: Sessao) {
   ligarCriar(el);
 }
 
-const botaoImportar = (s: Sessao, n: number) => `<button type="button" class="btn primary" id="btnImp"${n && s.conta ? '' : ' disabled'}>${s.conta ? `Importar ${n} linhas em ${esc(nomeConta(s.conta))}` : 'Escolha a conta para importar'}</button>`;
+/**
+ * Botão de importar do detalhe. Arquivo já importado: "Nenhuma linha nova" (apagado) e "Importar
+ * mesmo assim" sem destaque; parte já importada: o botão diz quantas são novas.
+ */
+function botaoImportar(s: Sessao, n: number) {
+  if (!s.conta) return '<button type="button" class="btn primary" id="btnImp" disabled>Escolha a conta para importar</button>';
+  const a = avisoDe(s), conta = esc(nomeConta(s.conta));
+  if (n && todasRepetidas(a)) return `<button type="button" class="btn primary" disabled>Nenhuma linha nova</button>
+    <button type="button" class="btn" id="btnImp">Importar mesmo assim</button>`;
+  const novas = n - a.conhecidas;
+  if (n && a.conhecidas) return `<button type="button" class="btn primary" id="btnImp">Importar ${novas === 1 ? '1 linha nova' : `${novas} linhas novas`} em ${conta}</button>`;
+  return `<button type="button" class="btn primary" id="btnImp"${n ? '' : ' disabled'}>Importar ${n === 1 ? '1 linha' : `${n} linhas`} em ${conta}</button>`;
+}
 const botaoCancelar = () => `<button type="button" class="btn" id="btnCancelar">${lote.length > 1 ? 'Voltar' : 'Cancelar'}</button>`;
 
 /** Linhas como vão entrar: sem as tiradas, com as mudanças e o tipo/categoria que o app vai dar. */
@@ -537,7 +549,7 @@ function passoTabela(el: HTMLElement, s: Sessao) {
   $('#mAba')?.addEventListener('change', () => { s.aba = ($('#mAba') as HTMLSelectElement).value; s.rows = s.lerAba!(s.aba); s.ed = undefined; s.sel = undefined; aplicarModelo(s); passo(); });
   ligarCabecalho(el, s);
   $('#btnImp').onclick = async () => {
-    if (!(await podeImportar([s]))) return;
+    if (!(await podeImportar([s], true))) return;
     // Num lote, o modelo é sempre salvo (é ele que faz o app reconhecer o arquivo da próxima vez).
     const salvar = ($('#mSalvar') as HTMLInputElement | null)?.checked ?? true;
     s.resultado = [await importar(s.conta, conv.linhas, s.arquivo, s.ed)];
@@ -569,7 +581,7 @@ function passoOfx(el: HTMLElement, s: Sessao) {
   $('#oInv').onchange = () => { s.inverter = ($('#oInv') as HTMLInputElement).checked; passo(); };
   ligarCabecalho(el, s);
   ligarLinhas(el, s);
-  $('#btnImp').onclick = async () => { if (!(await podeImportar([s]))) return; s.resultado = [await importar(s.conta, linhas, s.arquivo, s.ed)]; terminouUm(); };
+  $('#btnImp').onclick = async () => { if (!(await podeImportar([s], true))) return; s.resultado = [await importar(s.conta, linhas, s.arquivo, s.ed)]; terminouUm(); };
 }
 
 function passoPdf(el: HTMLElement, s: Sessao) {
@@ -582,7 +594,7 @@ function passoPdf(el: HTMLElement, s: Sessao) {
   </section>`;
   ligarCabecalho(el, s);
   ligarLinhas(el, s);
-  $('#btnImp').onclick = async () => { if (!(await podeImportar([s]))) return; s.resultado = [await importar(s.conta, p.linhas, s.arquivo, s.ed)]; terminouUm(); };
+  $('#btnImp').onclick = async () => { if (!(await podeImportar([s], true))) return; s.resultado = [await importar(s.conta, p.linhas, s.arquivo, s.ed)]; terminouUm(); };
 }
 
 function passoFinai(el: HTMLElement, s: Sessao) {
@@ -599,7 +611,7 @@ function passoFinai(el: HTMLElement, s: Sessao) {
   el.querySelectorAll<HTMLSelectElement>('[data-dest]').forEach(x => (x.onchange = () => { s.destino![x.dataset.dest!] = x.value; }));
   $('#btnLista')?.addEventListener('click', () => { aberto = -1; passo(); });
   $('#btnCancelar').onclick = fechar;
-  $('#btnImp').onclick = async () => { if (!(await podeImportar([s]))) return; s.resultado = await importarFinai(s); terminouUm(); };
+  $('#btnImp').onclick = async () => { if (!(await podeImportar([s], true))) return; s.resultado = await importarFinai(s); terminouUm(); };
 }
 
 async function importarFinai(s: Sessao): Promise<Importacao[]> {

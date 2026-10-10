@@ -37,7 +37,7 @@ const FORMATOS: { teste: (l: string[]) => boolean; fonte: Omit<Fonte, 'por'> }[]
   // Rico / XP: fatura do cartão: Data;Estabelecimento;Portador;Valor;Parcela
   { teste: l => tem(l, 'data', 'estabelecimento', 'portador', 'valor'), fonte: { banco: 'Rico', tipo: 'cartao', rotulo: 'fatura do cartão Rico' } },
   // Flash: extrato: Data,Hora,Movimentação,Valor,Meio de Pagamento,Saldo
-  { teste: l => tem(l, 'data', 'movimentacao', 'valor') && l.includes('meio de pagamento'), fonte: { banco: 'Flash', tipo: 'corrente', rotulo: 'extrato Flash' } },
+  { teste: l => tem(l, 'data', 'movimentacao', 'valor') && (l.includes('meio de pagamento') || l.includes('saldo')), fonte: { banco: 'Flash', tipo: 'corrente', rotulo: 'extrato Flash' } },
   // Mercado Pago: relatório da conta em planilha (RELEASE_DATE, TRANSACTION_NET_AMOUNT…)
   { teste: l => l.includes('release date') && l.some(x => x.includes('net amount')), fonte: { banco: 'Mercado Pago', tipo: 'corrente', rotulo: 'extrato da conta Mercado Pago' } },
 ];
