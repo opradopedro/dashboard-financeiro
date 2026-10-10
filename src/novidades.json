@@ -1,6 +1,6 @@
 {
   "proxima": [
-    "Fatura paga com valor redondo: o Pix para você mesmo (com seu nome) ou para o banco do cartão é ligado ao pagamento mesmo sem o valor exato; a sobra que fica na conta do banco não conta como gasto.",
+    "Fatura paga com o valor arredondado: o Pix com a fatura arredondada em reais (ex.: fatura de R$ 1.118,30 paga com R$ 1.118, 1.119 ou 1.120) é ligado ao pagamento; com seu nome ou o banco do cartão na descrição, aceita até 15% de diferença. A sobra que fica na conta do banco não conta como gasto.",
     "Aviso de repetido: antes de importar um arquivo que já foi importado (ou linhas iguais às de outro extrato), lançar uma entrada ou saída igual a uma que já existe, ou criar regra ou conta igual, o app pergunta “Já existe … exatamente como essa. Deseja continuar?”.",
     "Arquivos já importados: toque para ver as linhas; marque algumas (ou todas) e mude categoria ou tipo, inverta o sinal ou exclua de uma vez.",
     "Na importação, a lista de linhas tem as mesmas ações antes de importar, mostra como cada linha vai entrar (ex.: pagamento de fatura) e o resumo não soma pagamento de fatura como entrada.",

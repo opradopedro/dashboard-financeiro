@@ -132,7 +132,7 @@ describe('pagamento da fatura ligado ao Pix que pagou', () => {
   });
 });
 
-describe('fatura paga com valor redondo', () => {
+describe('fatura paga com o valor arredondado', () => {
   const cs: Conta[] = [...contas, { id: 'rico', nome: 'Rico crédito', banco: 'Rico', tipo: 'cartao', ativa: true }];
   const titular = 'Fulano de Tal Souza';
   it('Pix redondo para você mesmo paga a fatura; a sobra não vira gasto', () => {
@@ -155,6 +155,26 @@ describe('fatura paga com valor redondo', () => {
     const c2 = classificar(ts2, { ...ctx, contas: cs, titular });
     expect(c2[1].par).toBe(c2[2].id);
     expect(c2[0].t).toBe('interna'); // continua sendo dinheiro seu indo para outra conta sua
+  });
+  it('fatura arredondada em reais (sem centavos), para qualquer descrição', () => {
+    for (const v of [1118, 1119, 1120]) {
+      const ts = [tx('mp', '2026-08-26', 'Transferência enviada', -v), tx('rico', '2026-08-31', 'Pagamento de fatura', 1118.30)];
+      const cls = classificar(ts, { ...ctx, contas: cs });
+      expect(cls[0].par).toBe(cls[1].id);
+      expect(cls[0].t).toBe('fatura');
+    }
+  });
+  it('com centavos ou longe demais, sem seu nome: não liga', () => {
+    for (const [desc, v] of [['Pix enviado Beltrano', 1117.5], ['Pix enviado Beltrano', 1130]] as const) {
+      const cls = classificar([tx('mp', '2026-08-26', desc, -v), tx('rico', '2026-08-31', 'Pagamento de fatura', 1118.30)], { ...ctx, contas: cs });
+      expect(cls[1].par).toBeUndefined();
+    }
+  });
+  it('dois candidatos sem centavos: vence o mais perto do valor', () => {
+    const ts = [tx('mp', '2026-08-20', 'Pix enviado A', -1122), tx('mp', '2026-08-21', 'Pix enviado B', -1119), tx('rico', '2026-08-31', 'Pagamento de fatura', 1118.30)];
+    const cls = classificar(ts, { ...ctx, contas: cs });
+    expect(cls[2].par).toBe(cls[1].id);
+    expect(cls[0].t).toBe('saida');
   });
   it('valor muito diferente não liga', () => {
     const ts = [tx('mp', '2026-08-26', 'Pix enviado Fulano de Tal Souza', -2000), tx('rico', '2026-08-31', 'Pagamento de fatura', 586.65)];

@@ -74,8 +74,8 @@ export interface Contexto { contas: Conta[]; categorias: Categoria[]; regrasCat:
 /**
  * Classifica todas as transações. Além do tipo de cada uma, junta pares: o mesmo valor saindo de
  * uma conta sua e entrando em outra conta sua em até 3 dias é transferência interna; o pagamento
- * da fatura no cartão casa com o Pix/débito que o pagou (mesmo valor, ou valor redondo para você
- * mesmo ou para o banco do cartão; 10 dias antes a 5 depois).
+ * da fatura no cartão casa com o Pix/débito que o pagou (mesmo valor, ou a fatura arredondada em
+ * reais; 10 dias antes a 5 depois).
  */
 export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
   const tipoConta = new Map(ctx.contas.map(c => [c.id, c.tipo]));
@@ -106,8 +106,12 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
   // Pagamento da fatura: o pagamento que aparece no cartão casa com a saída da sua conta que o
   // pagou (o Pix ou débito), de 10 dias antes até 5 dias depois. Os dois ficam fora de entradas e
   // gastos: o gasto já contou em cada compra.
-  // 1º) mesmo valor; 2º) valor redondo (a sobra fica na conta do banco do cartão, ou a falta sai do
-  // que já estava lá): só se a saída for para você mesmo (seu nome) ou citar o banco do cartão.
+  // 1º) mesmo valor;
+  // 2º) a fatura arredondada em reais, sem centavos (R$ 1.118,30 → 1.118, 1.119 ou 1.120): até
+  //     R$ 5 ou 1% de diferença, qualquer descrição;
+  // 3º) valor mais solto (até 15% ou R$ 50 de diferença) só se a saída for para você mesmo (seu nome)
+  //     ou citar o banco do cartão.
+  // A sobra fica na conta do banco do cartão (ou a falta sai do que já estava lá): não é gasto.
   const ehCartao = (x: Classificada) => tipoConta.get(x.conta) === 'cartao';
   const bancoDe = new Map(ctx.contas.map(c => [c.id, norm(c.banco).trim()]));
   const pagamentos = out.filter(x => ehCartao(x) && (x.t === 'fatura' || (x.valor > 0 && x.auto && !x.tipo))).sort((a, b) => a.data.localeCompare(b.data));
@@ -126,14 +130,21 @@ export function classificar(txs: Transacao[], ctx: Contexto): Classificada[] {
     // Com dois de mesmo valor, vence o que cita o banco do cartão ou "fatura"; depois, o mais perto da data.
     ligar(cc, cands.sort((a, b) => Number(citaBanco(cc, b)) - Number(citaBanco(cc, a)) || Math.abs(antes(cc, a)) - Math.abs(antes(cc, b)))[0]);
   }
-  for (const cc of pagamentos) {
-    if (usados.has(cc)) continue;
-    const v = Math.abs(cc.valor);
-    const cands = out.filter(x => podePagar(cc, x) && (citaBanco(cc, x) || (!!ctx.titular && ehTitular(x.desc, ctx.titular)))
-      && -x.valor >= v * 0.7 && -x.valor <= Math.max(v * 1.3, v + 100));
-    if (!cands.length) continue;
-    ligar(cc, cands.sort((a, b) => Math.abs(-a.valor - v) - Math.abs(-b.valor - v) || Math.abs(antes(cc, a)) - Math.abs(antes(cc, b)))[0]);
-  }
+  const semCentavos = (x: Classificada) => Math.abs(x.valor * 100) % 100 < 0.5;
+  const proprio = (cc: Classificada, x: Classificada) => citaBanco(cc, x) || (!!ctx.titular && ehTitular(x.desc, ctx.titular));
+  const aproximar = (filtro: (cc: Classificada, x: Classificada, v: number) => boolean) => {
+    for (const cc of pagamentos) {
+      if (usados.has(cc)) continue;
+      const v = Math.abs(cc.valor);
+      const cands = out.filter(x => podePagar(cc, x) && filtro(cc, x, v));
+      if (!cands.length) continue;
+      // Vence a que é para você ou cita o banco; depois, a de valor mais perto; depois, a data mais perto.
+      ligar(cc, cands.sort((a, b) => Number(proprio(cc, b)) - Number(proprio(cc, a)) || Math.abs(-a.valor - v) - Math.abs(-b.valor - v)
+        || Math.abs(antes(cc, a)) - Math.abs(antes(cc, b)))[0]);
+    }
+  };
+  aproximar((_, x, v) => semCentavos(x) && Math.abs(-x.valor - v) <= Math.max(5, v * 0.01));
+  aproximar((cc, x, v) => proprio(cc, x) && Math.abs(-x.valor - v) <= Math.max(50, v * 0.15));
   return out;
 }
 
