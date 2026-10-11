@@ -8,7 +8,7 @@ import { FORMAS, lugares, maioresGastos, porConta, porDiaSemana, porForma, recor
 import { TIPOS, contaNoTotal } from '../core/tipos';
 import { hoje, somaDias, somaMes } from '../core/util';
 import { brl, compact, esc, fmtD, fmtNum, fmtYm, MES, mesLongo, sinal, toast } from './fmt';
-import { COR_OUTRAS, CORES_CAT, graficoRitmo, graficoSemana, pizza } from './graficos';
+import { COR_OUTRAS, CORES_CAT, graficoRitmo, graficoSemana, mostradorHud, pizza } from './graficos';
 import { trocar } from './nav';
 import { botaoFiltro, clsFiltradas, filtroAtivo, ligarFiltro, linhaFiltro } from './filtro';
 import { ICONES } from './icones';
@@ -202,6 +202,7 @@ export function telaPainel(el: HTMLElement) {
 
   el.innerHTML = `
   <section class="fita">
+    ${mostradorHud()}
     ${navMes(mes, botaoFiltro())}
     ${linhaFiltro()}
     <p class="frase">${frase}</p>

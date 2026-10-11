@@ -69,16 +69,16 @@ let seqGrafico = 0;
 /**
  * Pizza em 3D: disco inclinado, fatias um pouco separadas (abrem quando o gráfico entra na tela,
  * ver animarGraficos), parede e cortes com sombra, brilho no topo e um anel tracejado embaixo.
- * A porcentagem vai escrita na fatia (o 3D engana o tamanho, o número não). Cada fatia é tocável
- * e abre o detalhe dela (data-ir). Partes pequenas ganham um mínimo para dar para tocar.
- * Ângulo 0 = fundo do disco (meio-dia), no sentido do relógio.
+ * A porcentagem fica fora, um pouco acima, ligada à fatia por uma linha pontilhada em ângulo reto
+ * (o 3D engana o tamanho, o número não). Fatia e rótulo são tocáveis e abrem o detalhe (data-ir).
+ * Partes pequenas ganham um mínimo para dar para tocar. Ângulo 0 = fundo do disco, sentido horário.
  */
-export function pizza(partes: Parte[], opc: { larg?: number } = {}) {
+export function pizza(partes: Parte[]) {
   const ps = partes.filter(p => p.v > 0.005);
   const total = ps.reduce((a, p) => a + p.v, 0);
   if (total <= 0) return '';
-  const W = opc.larg ?? 300, R = W / 2 - 22, k = 0.56, ry = R * k, h = R * 0.16, abre = 7;
-  const cx = W / 2, cy = ry + 16, H = Math.ceil(cy + ry + h + 24);
+  const W = 340, R = 102, k = 0.56, ry = R * k, h = R * 0.16, abre = 7, TOPO = 46;
+  const cx = W / 2, cy = TOPO + ry;
   const id = `g3d${++seqGrafico}`;
   const n = (v: number) => v.toFixed(2);
   const P = (raio: number, a: number, dy = 0) => `${n(cx + raio * Math.sin(a))},${n(cy - raio * Math.cos(a) * k + dy)}`;
@@ -86,12 +86,13 @@ export function pizza(partes: Parte[], opc: { larg?: number } = {}) {
     `A${n(R)},${n(ry)} 0 ${Math.abs(a1 - a0) > Math.PI ? 1 : 0} ${volta ? 0 : 1} ${P(R, volta ? a0 : a1, dy)}`;
   const topo = (a0: number, a1: number) => `M${cx},${cy}L${P(R, a0)}${arco(a0, a1)}z`;
   // Parede de fora: só a metade da frente (90° a 270°) aparece.
+  const faixa = (a0: number, a1: number) => [Math.max(a0, Math.PI / 2), Math.min(a1, 1.5 * Math.PI)];
   const parede = (a0: number, a1: number) => {
-    const b0 = Math.max(a0, Math.PI / 2), b1 = Math.min(a1, 1.5 * Math.PI);
+    const [b0, b1] = faixa(a0, a1);
     return b1 - b0 > 0.001 ? `M${P(R, b0)}${arco(b0, b1)}L${P(R, b1, h)}${arco(b0, b1, h, true)}z` : '';
   };
   const borda = (a0: number, a1: number) => {
-    const b0 = Math.max(a0, Math.PI / 2), b1 = Math.min(a1, 1.5 * Math.PI);
+    const [b0, b1] = faixa(a0, a1);
     return b1 - b0 > 0.001 ? `M${P(R, b0)}${arco(b0, b1)}` : '';
   };
   // Corte (lado da fatia), visível quando está virado para a frente.
@@ -103,23 +104,44 @@ export function pizza(partes: Parte[], opc: { larg?: number } = {}) {
   const fatias = ps.map((p, i) => {
     const f = p.v / total, da = 2 * Math.PI * (f < min ? min : f * escalaG), a0 = a, a1 = a + da, m = a + da / 2;
     a = a1;
-    return { p, i, f, a0, a1, m };
+    const dx = uma ? 0 : Math.sin(m) * abre, dy = uma ? 0 : -Math.cos(m) * abre * k;
+    return { p, i, f, a0, a1, m, dx, dy };
   });
   // Do fundo para a frente: o que está mais perto é desenhado por último.
-  const g = fatias.slice().sort((x, y) => Math.cos(y.m) - Math.cos(x.m)).map(({ p, i, f, a0, a1, m }) => {
+  const g = fatias.slice().sort((x, y) => Math.cos(y.m) - Math.cos(x.m)).map(({ p, i, f, a0, a1, dx, dy }) => {
     const cortes = uma ? '' : [Math.cos(a0 - Math.PI / 2) < 0 ? corte(a0) : '', Math.cos(a1 + Math.PI / 2) < 0 ? corte(a1) : ''].join('');
     const fora = uma ? parede(Math.PI / 2, 1.5 * Math.PI) : parede(a0, a1);
     const sup = uma ? `M${cx - R},${cy}a${n(R)},${n(ry)} 0 1 0 ${n(2 * R)},0a${n(R)},${n(ry)} 0 1 0 ${n(-2 * R)},0z` : topo(a0, a1);
     const aro = uma ? borda(Math.PI / 2, 1.5 * Math.PI) : borda(a0, a1);
-    const dx = uma ? 0 : Math.sin(m) * abre, dy = uma ? 0 : -Math.cos(m) * abre * k;
     const titulo = `${p.rotulo}: ${brl(p.v)} (${Math.round(f * 100)}%)`;
-    const rotulo = f >= 0.05 ? `<text x="${n(cx + R * 0.6 * Math.sin(m))}" y="${n(cy - R * 0.6 * Math.cos(m) * k + 4)}" text-anchor="middle" font-size="12" font-weight="650" fill="#fff" stroke="rgba(8,12,20,.6)" stroke-width="3" paint-order="stroke" stroke-linejoin="round" pointer-events="none">${Math.round(f * 100)}%</text>` : '';
     return `<g class="fatia${p.ir ? ' parte' : ''}"${p.ir ? ` data-ir="${esc(p.ir)}"` : ''} style="--dx:${n(dx)}px;--dy:${n(dy)}px;transition-delay:${i * 45}ms"><title>${esc(titulo)}</title>`
       + (cortes ? `<path d="${cortes}" fill="${p.cor}"/><path d="${cortes}" fill="#000" opacity=".42"/>` : '')
       + (fora ? `<path d="${fora}" fill="${p.cor}"/><path d="${fora}" fill="url(#${id}p)"/>` : '')
       + `<path d="${sup}" fill="${p.cor}"/><path d="${sup}" fill="url(#${id}b)" pointer-events="none"/>`
       + (aro ? `<path d="${aro}" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="1" pointer-events="none"/>` : '')
-      + `${rotulo}</g>`;
+      + '</g>';
+  }).join('');
+  // Rótulos: ponto na fatia (já aberta), sobe e vira para a borda; o número fica sobre a linha.
+  const LIM = 0.04, PASSO = 34, SOBE = 26;
+  let H = Math.ceil(cy + ry + h + 24);
+  const rotulos = (['dir', 'esq'] as const).map(lado => {
+    let ultimo = -Infinity;
+    return fatias.filter(x => x.f >= LIM && (Math.sin(x.m) >= 0) === (lado === 'dir'))
+      .map(x => ({ ...x, ax: cx + x.dx + R * 0.74 * Math.sin(x.m), ay: cy + x.dy - R * 0.74 * Math.cos(x.m) * k }))
+      .sort((x, y) => x.ay - y.ay)
+      .map(x => {
+        const y = Math.max(x.ay - SOBE, ultimo + PASSO, 30);
+        ultimo = y;
+        H = Math.max(H, Math.ceil(y + 8));
+        const bx = lado === 'dir' ? W - 2 : 2, ancora = lado === 'dir' ? 'end' : 'start';
+        const nome = x.p.rotulo.length > 12 ? x.p.rotulo.slice(0, 11) + '…' : x.p.rotulo;
+        return `<g class="rot${x.p.ir ? ' parte' : ''}"${x.p.ir ? ` data-ir="${esc(x.p.ir)}"` : ''} style="transition-delay:${350 + x.i * 60}ms">
+          <path d="M${n(x.ax)},${n(x.ay)}V${n(y)}H${bx}" fill="none" stroke="var(--tech)" stroke-width="1" stroke-dasharray="2 3" stroke-opacity=".75"/>
+          <circle cx="${n(x.ax)}" cy="${n(x.ay)}" r="5" fill="var(--tech)" opacity=".25"/><circle cx="${n(x.ax)}" cy="${n(x.ay)}" r="2.4" fill="#fff"/>
+          <text class="pct" x="${bx}" y="${n(y - 15)}" text-anchor="${ancora}">${Math.round(x.f * 100)}%</text>
+          <text class="nome" x="${bx}" y="${n(y - 4)}" text-anchor="${ancora}">${esc(nome)}</text>
+          <rect x="${lado === 'dir' ? W - 70 : 0}" y="${n(y - 30)}" width="70" height="32" fill="transparent"/></g>`;
+      }).join('');
   }).join('');
   const anelR = R + 13;
   return `<div class="pizza3d"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(ps.map(p => `${p.rotulo} ${brl(p.v)}`).join(', '))}" font-family="inherit">
@@ -131,6 +153,7 @@ export function pizza(partes: Parte[], opc: { larg?: number } = {}) {
     <ellipse class="anel" cx="${cx}" cy="${n(cy + h + 2)}" rx="${n(anelR)}" ry="${n(anelR * k)}" fill="none" stroke="var(--tech)" stroke-width="1" stroke-dasharray="2 5"/>
     <ellipse cx="${cx}" cy="${n(cy + h + 4)}" rx="${n(R * 1.05)}" ry="${n(ry * 1.1)}" fill="url(#${id}s)"/>
     ${g}
+    <g class="rotulos">${rotulos}</g>
   </svg></div>`;
 }
 
@@ -143,4 +166,20 @@ export function animarGraficos(raiz: ParentNode) {
   observador?.disconnect();
   observador = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle('aberta', e.isIntersecting)), { threshold: 0.55 });
   els.forEach(e => observador!.observe(e));
+}
+
+/** Mostrador decorativo (anéis, marcas e R$) atrás do topo do Painel; o CSS deixa quase apagado. */
+export function mostradorHud() {
+  let marcas = '';
+  for (let i = 0; i < 72; i++) {
+    const a = (i * 5 * Math.PI) / 180, r0 = i % 6 ? 93 : 87;
+    marcas += `M${(105 + r0 * Math.sin(a)).toFixed(1)},${(105 - r0 * Math.cos(a)).toFixed(1)}L${(105 + 98 * Math.sin(a)).toFixed(1)},${(105 - 98 * Math.cos(a)).toFixed(1)}`;
+  }
+  return `<div class="hud" aria-hidden="true"><svg viewBox="0 0 210 210" fill="none" stroke="var(--tech)">
+    <g class="gira"><circle cx="105" cy="105" r="102" stroke-width=".8"/><path d="${marcas}" stroke-width="1"/></g>
+    <g class="gira2"><circle cx="105" cy="105" r="79" stroke-width="3" stroke-dasharray="34 10 6 10"/><circle cx="105" cy="105" r="70" stroke-width=".8" stroke-dasharray="2 4"/></g>
+    <circle cx="105" cy="105" r="56" stroke-width="1"/>
+    <path d="M105,40V58M105,152V170M40,105H58M152,105H170" stroke-width="1"/>
+    <text x="105" y="117" text-anchor="middle" fill="var(--tech)" stroke="none" font-size="34" font-weight="600" style="font-family:var(--num)">R$</text>
+  </svg></div>`;
 }

@@ -151,12 +151,16 @@ Até o app abrir a primeira vez, vale `Fila.PACOTES_INICIAIS` (igual a `APPS_INI
 “Caderno-caixa noturno” (plano feito com a skill frontend-design). Tokens em `src/style.css`:
 noite #0E1420, lousa #161E2D, papel #E9EDF3, grafite #8E9AB0, champanhe #D9C8A4 (ações);
 dados: entrada #3B97C9, saída #CF7448 (validadas para daltonismo; verde/vermelho reprova).
-Fontes embutidas: Montserrat Alternates (títulos, nome do mês) e Montserrat variável (texto,
-números 300 tabulares). Evitar: rótulos em CAIXA ALTA, “·” como separador, “›”/“→” em botões,
+Fontes embutidas (`src/fontes.css`, só latino): Exo 2 (títulos, nome do mês, números grandes,
+`--titulo`/`--num`), JetBrains Mono (rótulos pequenos de dados: %, eixos, marcas; `--mono`) e
+Montserrat variável (texto). Evitar: rótulos em CAIXA ALTA, “·” como separador, “›”/“→” em botões,
 cartões iguais para tudo. A peça marcante é o topo do Painel (mês grande + frase + fita dupla).
 Toque tech discreto: `--tech` #6FC3DF só em fios, marcas e brilhos (ponto aceso antes do título da
-seção, fio de luz no alto de `.folha`/`.caixa`, grade de pontos no fundo, anel tracejado das
-pizzas). Gráficos de parte do todo são sempre pizza 3D (o dono pediu; nada de rosca).
+seção, fio de luz e cantos de mira em `.folha`/`.caixa`, grade de pontos no fundo, mostrador com R$
+girando atrás do topo do Painel, brilho nos valores em `<b>` da frase, anel tracejado das pizzas).
+Gráficos de parte do todo são sempre pizza 3D (o dono pediu; nada de rosca), com a % fora, acima,
+ligada por linha pontilhada em ângulo reto. "Uns 30% de HUD": não exagerar.
+- Voltar (`nav.voltar`) reabre a página na mesma rolagem (`posicaoDeVolta`); ir para frente começa do topo.
 
 ## Convenções
 

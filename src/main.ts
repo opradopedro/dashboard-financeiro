@@ -1,17 +1,12 @@
 import '@fontsource-variable/montserrat/wght.css';
-// Montserrat Alternates (variação da Montserrat) nos títulos e no nome do mês.
-import '@fontsource/montserrat-alternates/latin-200.css';
-import '@fontsource/montserrat-alternates/latin-ext-200.css';
-import '@fontsource/montserrat-alternates/latin-500.css';
-import '@fontsource/montserrat-alternates/latin-ext-500.css';
-import '@fontsource/montserrat-alternates/latin-600.css';
-import '@fontsource/montserrat-alternates/latin-ext-600.css';
+// Exo 2 (títulos e números grandes) e JetBrains Mono (rótulos de dados), só latino.
+import './fontes.css';
 import './style.css';
 import { atualizarEstado, aoMudar, consumirFila, iniciarDados, sincronizarNativo, state } from './app';
 import { ICONES } from './ui/icones';
 import { nativo } from './nativo/notificacoes';
 import { $, $$, toast } from './ui/fmt';
-import { ABAS, aba, ir, rotaAtual, voltar, type Rota } from './ui/nav';
+import { ABAS, aba, ir, posicaoDeVolta, rotaAtual, voltar, type Rota } from './ui/nav';
 import { animarGraficos } from './ui/graficos';
 import { telaAvancado } from './ui/avancado';
 import { abrirMes, mudarMes, recorteDe, telaCategoria, telaDetalhe, telaFora, telaMovimentos, telaPainel, telaSemCategoria, tituloRecorte } from './ui/painel';
@@ -102,8 +97,11 @@ function marcarPendencias() {
 let ultimaRota = '';
 addEventListener('hashchange', () => {
   const h = location.hash;
-  render(h !== ultimaRota);
-  if (h.split('?')[0] !== ultimaRota.split('?')[0] || h.indexOf('/detalhe?') >= 0) scrollTo(0, 0);
+  const volta = posicaoDeVolta();
+  render(h !== ultimaRota && volta == null);
+  // Voltando: a página reabre onde você estava; indo para uma página nova: do topo.
+  if (volta != null) scrollTo(0, volta);
+  else if (h.split('?')[0] !== ultimaRota.split('?')[0] || h.indexOf('/detalhe?') >= 0) scrollTo(0, 0);
   ultimaRota = h;
 });
 addEventListener('rerender', () => render(false));

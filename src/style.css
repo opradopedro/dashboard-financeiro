@@ -1,6 +1,6 @@
 /*
- * Caderno-caixa noturno. Montserrat Alternates nos títulos e no nome do mês (as letras alternativas
- * dão o desenho); Montserrat no texto e nos números leves (300) com algarismos tabulares. Uma peça marcante (o topo do Painel); o resto quieto.
+ * Caderno-caixa noturno com um toque de painel tech (HUD): Exo 2 nos títulos, no nome do mês e nos
+ * números grandes; JetBrains Mono nos rótulos pequenos de dados; Montserrat no texto e nos números leves (300) com algarismos tabulares. Uma peça marcante (o topo do Painel); o resto quieto.
  * Cores de dados validadas para daltonismo no fundo escuro: entradas azul, saídas cobre.
  */
 :root{
@@ -17,7 +17,9 @@
   --sat:var(--safe-area-inset-top,env(safe-area-inset-top,0px));
   --sab:var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px));
   --fonte:'Montserrat Variable','Montserrat',system-ui,sans-serif;
-  --titulo:'Montserrat Alternates','Montserrat Variable',system-ui,sans-serif;
+  --titulo:'Exo 2 Variable','Montserrat Variable',system-ui,sans-serif;
+  --num:'Exo 2 Variable','Montserrat Variable',system-ui,sans-serif;
+  --mono:'JetBrains Mono Variable',ui-monospace,'Roboto Mono',monospace;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -79,7 +81,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* ---------- topo do Painel: a fita do mês ---------- */
 .fita{display:flex;flex-direction:column;gap:18px;padding-top:4px}
 .fita-mes{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.fita-mes h2{min-width:0;font-size:clamp(34px,11vw,58px);font-weight:200;letter-spacing:-.035em;line-height:.95;color:var(--papel)}
+.fita-mes h2{min-width:0;font-size:clamp(36px,11.5vw,60px);font-weight:200;letter-spacing:-.02em;line-height:.95;color:var(--papel)}
 .fita-mes h2 small{font-family:var(--fonte);font-size:15px;font-weight:500;letter-spacing:0;color:var(--grafite);margin-left:8px}
 .fita-mes .setas{display:flex;gap:4px;flex:none}
 .fita-mes .setas button{width:38px;height:38px;border-radius:50%;border:1px solid var(--linha);background:transparent;color:var(--grafite-claro);display:inline-flex;align-items:center;justify-content:center}
@@ -95,8 +97,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .fita-valores{display:flex;justify-content:space-between;gap:12px}
 .fita-valores div{display:flex;flex-direction:column;gap:2px}
 .fita-valores div:last-child{text-align:right;align-items:flex-end}
-.fita-valores span{font-size:13px;color:var(--grafite);display:inline-flex;align-items:center;gap:7px}
-.fita-valores b{font-size:20px;font-weight:400;letter-spacing:-.01em}
+.fita-valores span{font-size:11.5px;font-family:var(--mono);letter-spacing:.02em;color:var(--grafite);display:inline-flex;align-items:center;gap:7px}
+.fita-valores b{font-family:var(--num);font-size:22px;font-weight:400;letter-spacing:0}
 .ponto{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
 .ponto.e{background:var(--entrada)} .ponto.s{background:var(--saida)}
 
@@ -117,7 +119,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* ---------- gráficos ---------- */
 .chart{width:100%;min-width:0}
 .chart svg{display:block;width:100%;height:auto}
-.legenda{display:flex;gap:18px;font-size:13px;color:var(--grafite)}
+.legenda{display:flex;gap:18px;font-size:11.5px;font-family:var(--mono);color:var(--grafite)}
+.chart text{font-family:var(--mono)}
 .legenda span{display:inline-flex;align-items:center;gap:7px}
 .legenda i{width:10px;height:10px;border-radius:3px;display:inline-block}
 
@@ -126,9 +129,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 14px;padding:13px 0;border-top:1px solid var(--linha);align-items:center}
 .item:first-child{border-top:0}
 .item .name{font-weight:550;min-width:0;overflow-wrap:anywhere;font-size:14.5px}
-.item .val{font-weight:500;text-align:right;white-space:nowrap;font-size:14.5px}
+.item .val{font-family:var(--num);font-weight:500;text-align:right;white-space:nowrap;font-size:15px}
 .item .meta{color:var(--grafite);font-size:12.5px;min-width:0;overflow-wrap:anywhere}
-.item .meta.r{text-align:right}
+.item .meta.r{text-align:right;font-family:var(--mono);font-size:11.5px}
 .item .meta.full{grid-column:1/-1}
 .item .clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 button.item{background:none;border:0;border-top:1px solid var(--linha);text-align:left;width:100%;color:inherit}
@@ -377,3 +380,28 @@ select:not([multiple]){pointer-events:none}
   border:1px solid var(--linha-forte);border-radius:var(--raio-m);padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 -8px 30px rgba(6,9,15,.5)}
 .barra-sel b{font-weight:600;font-size:14.5px}
 body.selecionando{padding-bottom:calc(230px + var(--sab))}
+
+/* ---------- toque tech (HUD) ---------- */
+/* Números grandes e valores em destaque: Exo 2, com um brilho frio. */
+.big,.frase b{font-family:var(--num)}
+.frase b{color:#fff;font-weight:500;text-shadow:0 0 18px rgba(111,195,223,.35)}
+.tag{font-family:var(--mono);font-weight:550;letter-spacing:.01em}
+/* Cantos de mira nos blocos (canto de cima à esquerda e de baixo à direita). */
+.folha,.caixa{position:relative}
+.folha::before,.caixa::before,.folha::after,.caixa::after{content:"";position:absolute;width:12px;height:12px;pointer-events:none;opacity:.6}
+.folha::before,.caixa::before{top:-1px;left:-1px;border-top:1.5px solid var(--tech);border-left:1.5px solid var(--tech);border-top-left-radius:var(--raio-m)}
+.folha::after,.caixa::after{bottom:-1px;right:-1px;border-bottom:1.5px solid var(--tech);border-right:1.5px solid var(--tech);border-bottom-right-radius:var(--raio-m)}
+/* Mostrador com R$ atrás do topo do Painel: gira devagar, quase apagado. */
+.fita{position:relative}
+.fita > :not(.hud){position:relative;z-index:1}
+.hud{position:absolute;right:-48px;top:44px;width:210px;height:210px;pointer-events:none;z-index:0;opacity:.16}
+.hud svg{width:100%;height:100%;overflow:visible}
+.hud .gira{transform-origin:105px 105px;animation:gira 80s linear infinite}
+.hud .gira2{transform-origin:105px 105px;animation:gira 50s linear infinite reverse}
+@keyframes gira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.hud .gira,.hud .gira2{animation:none}}
+/* Rótulos da pizza: número acima, ligado por linha pontilhada; aparecem depois das fatias abrirem. */
+.pizza3d .pct{font-family:var(--num);font-weight:650;font-size:16px;fill:#fff}
+.pizza3d .nome{font-family:var(--mono);font-size:9px;fill:var(--grafite-claro)}
+.pizza3d .rot{opacity:0;transition:opacity .45s ease-out}
+.pizza3d.aberta .rot{opacity:1}

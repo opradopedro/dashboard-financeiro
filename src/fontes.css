@@ -1,0 +1,16 @@
+/* Fontes embutidas (sem rede), só o alfabeto latino: Exo 2 nos títulos e números grandes,
+   JetBrains Mono nos rótulos pequenos de dados (porcentagens, eixos, marcas). */
+@font-face {
+  font-family: 'Exo 2 Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(@fontsource-variable/exo-2/files/exo-2-latin-wght-normal.woff2) format('woff2-variations');
+}
+@font-face {
+  font-family: 'JetBrains Mono Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url(@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2) format('woff2-variations');
+}

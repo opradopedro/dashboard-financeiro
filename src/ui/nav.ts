@@ -7,6 +7,10 @@ export interface Rota { nome: string; params: string[]; query: URLSearchParams }
 export const ABAS = ['', 'transacoes', 'notificacoes', 'importar', 'ajustes'];
 
 let profundidade = 0;
+// Posição da rolagem de cada página que ficou para trás, para voltar no mesmo lugar.
+const posicoes = new Map<string, number>();
+let voltando = false;
+const chave = () => location.hash || '#/';
 
 export function rotaAtual(): Rota {
   const h = location.hash.replace(/^#\/?/, '');
@@ -17,6 +21,7 @@ export function rotaAtual(): Rota {
 
 /** Abre uma página (empilha). */
 export function ir(rota: string) {
+  posicoes.set(chave(), scrollY);
   profundidade++;
   location.hash = '#/' + rota;
 }
@@ -34,7 +39,14 @@ export function voltar() {
   const dlg = document.querySelector('dialog[open]') as HTMLDialogElement | null;
   if (dlg) { dlg.close(); return; }
   if (document.body.classList.contains('selecionando')) { dispatchEvent(new Event('sair-selecao')); return; }
-  if (profundidade > 0) { profundidade--; history.back(); return; }
-  if (rotaAtual().nome !== '') { aba(''); return; }
+  if (profundidade > 0) { profundidade--; voltando = true; history.back(); return; }
+  if (rotaAtual().nome !== '') { voltando = true; aba(''); return; }
   void nativo.sair();
+}
+
+/** Depois de voltar: a rolagem guardada da página (null = página nova, começa do topo). */
+export function posicaoDeVolta(): number | null {
+  if (!voltando) return null;
+  voltando = false;
+  return posicoes.get(chave()) ?? null;
 }
