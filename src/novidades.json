@@ -2,7 +2,9 @@
   "proxima": [
     "Voltar de um gráfico, card ou transação leva de volta ao mesmo ponto da tela, em vez do começo da página.",
     "Pizzas com a porcentagem e o nome fora do gráfico, um pouco acima, ligados à fatia por uma linha pontilhada em ângulo reto (tocar no rótulo também abre o detalhe).",
-    "Visual mais tech: fontes novas (Exo 2 nos títulos e valores, letras de painel nos rótulos), cantos de mira nos blocos, valores em destaque com brilho e um mostrador com R$ girando devagar atrás do topo do Painel."
+    "Visual mais tech: fontes novas (Exo 2 nos títulos e valores, letras de painel nos rótulos), cantos de mira nos blocos e valores em destaque com brilho.",
+    "Rótulos da pizza nunca ficam em cima do gráfico: se encostariam nele, sobem ou descem até um lugar livre, com um fundo escuro para ler fácil.",
+    "Fundo das telas liso, sem os pontinhos."
   ],
   "versoes": [
     {

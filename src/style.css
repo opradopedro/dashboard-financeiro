@@ -25,7 +25,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none !important}
 html{-webkit-text-size-adjust:100%;background:var(--noite)}
-body{margin:0;background:var(--noite) radial-gradient(rgba(142,154,176,.075) 1px,transparent 1.3px) 0 0/22px 22px;color:var(--papel);font-family:var(--fonte);font-size:15px;line-height:1.5;font-weight:450;
+body{margin:0;background:var(--noite);color:var(--papel);font-family:var(--fonte);font-size:15px;line-height:1.5;font-weight:450;
   padding:0 20px calc(104px + var(--sab));font-variant-numeric:tabular-nums;font-feature-settings:"tnum";-webkit-tap-highlight-color:transparent}
 .wrap{max-width:680px;margin-inline:auto;display:flex;flex-direction:column;gap:28px;width:100%}
 h1,h2,h3{margin:0;font-family:var(--titulo);font-weight:600;letter-spacing:-.01em}
@@ -391,17 +391,10 @@ body.selecionando{padding-bottom:calc(230px + var(--sab))}
 .folha::before,.caixa::before,.folha::after,.caixa::after{content:"";position:absolute;width:12px;height:12px;pointer-events:none;opacity:.6}
 .folha::before,.caixa::before{top:-1px;left:-1px;border-top:1.5px solid var(--tech);border-left:1.5px solid var(--tech);border-top-left-radius:var(--raio-m)}
 .folha::after,.caixa::after{bottom:-1px;right:-1px;border-bottom:1.5px solid var(--tech);border-right:1.5px solid var(--tech);border-bottom-right-radius:var(--raio-m)}
-/* Mostrador com R$ atrás do topo do Painel: gira devagar, quase apagado. */
-.fita{position:relative}
-.fita > :not(.hud){position:relative;z-index:1}
-.hud{position:absolute;right:-48px;top:44px;width:210px;height:210px;pointer-events:none;z-index:0;opacity:.16}
-.hud svg{width:100%;height:100%;overflow:visible}
-.hud .gira{transform-origin:105px 105px;animation:gira 80s linear infinite}
-.hud .gira2{transform-origin:105px 105px;animation:gira 50s linear infinite reverse}
-@keyframes gira{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.hud .gira,.hud .gira2{animation:none}}
 /* Rótulos da pizza: número acima, ligado por linha pontilhada; aparecem depois das fatias abrirem. */
 .pizza3d .pct{font-family:var(--num);font-weight:650;font-size:16px;fill:#fff}
 .pizza3d .nome{font-family:var(--mono);font-size:9px;fill:var(--grafite-claro)}
+.pizza3d .rot .fundo{fill:var(--noite);opacity:.82}
+.caixa .pizza3d .rot .fundo{fill:var(--lousa)}
 .pizza3d .rot{opacity:0;transition:opacity .45s ease-out}
 .pizza3d.aberta .rot{opacity:1}

@@ -66,6 +66,42 @@ export interface Parte { v: number; cor: string; rotulo: string; ir?: string }
 
 let seqGrafico = 0;
 
+/** Área ocupada pelo desenho (elipse) que um rótulo não pode cobrir. */
+export interface Elipse { cx: number; cy: number; a: number; b: number }
+
+/** A caixa (x0..x1, y0..y1) cobre parte da elipse? Testa linha a linha. */
+export function encosta(x0: number, x1: number, y0: number, y1: number, e: Elipse) {
+  for (let y = y0; y <= y1; y += 2) {
+    const t = (y - e.cy) / e.b;
+    if (Math.abs(t) >= 1) continue;
+    const hw = e.a * Math.sqrt(1 - t * t);
+    if (x1 > e.cx - hw && x0 < e.cx + hw) return true;
+  }
+  return false;
+}
+
+/**
+ * Altura da linha de cada rótulo de um lado (texto acima dela, encostado na borda): a mais perto da
+ * desejada em que o texto não cobre o desenho nem outro rótulo, procurando para cima e para baixo.
+ */
+export function posicionarRotulos(itens: { desejado: number; largura: number }[], lado: 'dir' | 'esq', W: number, obst: Elipse[],
+  opc: { passo?: number; minY?: number } = {}): number[] {
+  const passo = opc.passo ?? 34, minY = opc.minY ?? 30;
+  const usados: number[] = [];
+  return itens.map(it => {
+    const x0 = lado === 'dir' ? W - it.largura - 8 : 0, x1 = lado === 'dir' ? W : it.largura + 8;
+    const livre = (y: number) => y >= minY && usados.every(u => Math.abs(u - y) >= passo)
+      && !obst.some(e => encosta(x0, x1, y - 30, y + 2, e));
+    let y = Math.max(it.desejado, minY);
+    for (let d = 0; d <= 600; d += 2) {
+      if (livre(it.desejado - d)) { y = it.desejado - d; break; }
+      if (livre(it.desejado + d)) { y = it.desejado + d; break; }
+    }
+    usados.push(y);
+    return y;
+  });
+}
+
 /**
  * Pizza em 3D: disco inclinado, fatias um pouco separadas (abrem quando o gráfico entra na tela,
  * ver animarGraficos), parede e cortes com sombra, brilho no topo e um anel tracejado embaixo.
@@ -122,28 +158,37 @@ export function pizza(partes: Parte[]) {
       + '</g>';
   }).join('');
   // Rótulos: ponto na fatia (já aberta), sobe e vira para a borda; o número fica sobre a linha.
-  const LIM = 0.04, PASSO = 34, SOBE = 26;
+  // Se o texto encostar no disco (ou no anel), sobe ou desce até achar lugar livre.
+  const LIM = 0.04, anelR = R + 13, folga = abre + 3;
+  const obst: Elipse[] = [
+    { cx, cy, a: R + folga, b: ry + folga * k },
+    { cx, cy: cy + h, a: R + folga, b: ry + folga * k },
+    { cx, cy: cy + h + 2, a: anelR + 3, b: anelR * k + 3 },
+  ];
   let H = Math.ceil(cy + ry + h + 24);
   const rotulos = (['dir', 'esq'] as const).map(lado => {
-    let ultimo = -Infinity;
-    return fatias.filter(x => x.f >= LIM && (Math.sin(x.m) >= 0) === (lado === 'dir'))
-      .map(x => ({ ...x, ax: cx + x.dx + R * 0.74 * Math.sin(x.m), ay: cy + x.dy - R * 0.74 * Math.cos(x.m) * k }))
-      .sort((x, y) => x.ay - y.ay)
+    const itens = fatias.filter(x => x.f >= LIM && (Math.sin(x.m) >= 0) === (lado === 'dir'))
       .map(x => {
-        const y = Math.max(x.ay - SOBE, ultimo + PASSO, 30);
-        ultimo = y;
-        H = Math.max(H, Math.ceil(y + 8));
-        const bx = lado === 'dir' ? W - 2 : 2, ancora = lado === 'dir' ? 'end' : 'start';
         const nome = x.p.rotulo.length > 12 ? x.p.rotulo.slice(0, 11) + '…' : x.p.rotulo;
-        return `<g class="rot${x.p.ir ? ' parte' : ''}"${x.p.ir ? ` data-ir="${esc(x.p.ir)}"` : ''} style="transition-delay:${350 + x.i * 60}ms">
+        const pct = `${Math.round(x.f * 100)}%`;
+        return { ...x, nome, pct, ax: cx + x.dx + R * 0.74 * Math.sin(x.m), ay: cy + x.dy - R * 0.74 * Math.cos(x.m) * k,
+          largura: Math.max(pct.length * 9.6, nome.length * 5.5) };
+      })
+      .sort((x, y) => x.ay - y.ay);
+    const ys = posicionarRotulos(itens.map(x => ({ desejado: x.ay - 26, largura: x.largura })), lado, W, obst);
+    return itens.map((x, idx) => {
+      const y = ys[idx];
+      H = Math.max(H, Math.ceil(y + 8));
+      const bx = lado === 'dir' ? W - 2 : 2, ancora = lado === 'dir' ? 'end' : 'start';
+      const fx = lado === 'dir' ? W - 2 - x.largura - 4 : 0;
+      return `<g class="rot${x.p.ir ? ' parte' : ''}"${x.p.ir ? ` data-ir="${esc(x.p.ir)}"` : ''} style="transition-delay:${350 + x.i * 60}ms">
           <path d="M${n(x.ax)},${n(x.ay)}V${n(y)}H${bx}" fill="none" stroke="var(--tech)" stroke-width="1" stroke-dasharray="2 3" stroke-opacity=".75"/>
           <circle cx="${n(x.ax)}" cy="${n(x.ay)}" r="5" fill="var(--tech)" opacity=".25"/><circle cx="${n(x.ax)}" cy="${n(x.ay)}" r="2.4" fill="#fff"/>
-          <text class="pct" x="${bx}" y="${n(y - 15)}" text-anchor="${ancora}">${Math.round(x.f * 100)}%</text>
-          <text class="nome" x="${bx}" y="${n(y - 4)}" text-anchor="${ancora}">${esc(nome)}</text>
-          <rect x="${lado === 'dir' ? W - 70 : 0}" y="${n(y - 30)}" width="70" height="32" fill="transparent"/></g>`;
-      }).join('');
+          <rect class="fundo" x="${n(fx)}" y="${n(y - 29)}" width="${n(x.largura + 6)}" height="27" rx="3"/>
+          <text class="pct" x="${bx}" y="${n(y - 15)}" text-anchor="${ancora}">${x.pct}</text>
+          <text class="nome" x="${bx}" y="${n(y - 4)}" text-anchor="${ancora}">${esc(x.nome)}</text></g>`;
+    }).join('');
   }).join('');
-  const anelR = R + 13;
   return `<div class="pizza3d"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(ps.map(p => `${p.rotulo} ${brl(p.v)}`).join(', '))}" font-family="inherit">
     <defs>
       <radialGradient id="${id}s"><stop offset="0" stop-color="#000" stop-opacity=".6"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
@@ -168,18 +213,3 @@ export function animarGraficos(raiz: ParentNode) {
   els.forEach(e => observador!.observe(e));
 }
 
-/** Mostrador decorativo (anéis, marcas e R$) atrás do topo do Painel; o CSS deixa quase apagado. */
-export function mostradorHud() {
-  let marcas = '';
-  for (let i = 0; i < 72; i++) {
-    const a = (i * 5 * Math.PI) / 180, r0 = i % 6 ? 93 : 87;
-    marcas += `M${(105 + r0 * Math.sin(a)).toFixed(1)},${(105 - r0 * Math.cos(a)).toFixed(1)}L${(105 + 98 * Math.sin(a)).toFixed(1)},${(105 - 98 * Math.cos(a)).toFixed(1)}`;
-  }
-  return `<div class="hud" aria-hidden="true"><svg viewBox="0 0 210 210" fill="none" stroke="var(--tech)">
-    <g class="gira"><circle cx="105" cy="105" r="102" stroke-width=".8"/><path d="${marcas}" stroke-width="1"/></g>
-    <g class="gira2"><circle cx="105" cy="105" r="79" stroke-width="3" stroke-dasharray="34 10 6 10"/><circle cx="105" cy="105" r="70" stroke-width=".8" stroke-dasharray="2 4"/></g>
-    <circle cx="105" cy="105" r="56" stroke-width="1"/>
-    <path d="M105,40V58M105,152V170M40,105H58M152,105H170" stroke-width="1"/>
-    <text x="105" y="117" text-anchor="middle" fill="var(--tech)" stroke="none" font-size="34" font-weight="600" style="font-family:var(--num)">R$</text>
-  </svg></div>`;
-}

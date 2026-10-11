@@ -156,10 +156,12 @@ Fontes embutidas (`src/fontes.css`, só latino): Exo 2 (títulos, nome do mês, 
 Montserrat variável (texto). Evitar: rótulos em CAIXA ALTA, “·” como separador, “›”/“→” em botões,
 cartões iguais para tudo. A peça marcante é o topo do Painel (mês grande + frase + fita dupla).
 Toque tech discreto: `--tech` #6FC3DF só em fios, marcas e brilhos (ponto aceso antes do título da
-seção, fio de luz e cantos de mira em `.folha`/`.caixa`, grade de pontos no fundo, mostrador com R$
-girando atrás do topo do Painel, brilho nos valores em `<b>` da frase, anel tracejado das pizzas).
+seção, fio de luz e cantos de mira em `.folha`/`.caixa`, brilho nos valores em `<b>` da frase,
+anel tracejado das pizzas). Fundo da página liso: o dono não quer desenhos atrás (sem pontinhos,
+sem mostrador).
 Gráficos de parte do todo são sempre pizza 3D (o dono pediu; nada de rosca), com a % fora, acima,
-ligada por linha pontilhada em ângulo reto. "Uns 30% de HUD": não exagerar.
+ligada por linha pontilhada em ângulo reto; `posicionarRotulos` (testado) sobe ou desce o rótulo
+até ele não cobrir o disco, o anel nem outro rótulo. "Uns 30% de HUD": não exagerar.
 - Voltar (`nav.voltar`) reabre a página na mesma rolagem (`posicaoDeVolta`); ir para frente começa do topo.
 
 ## Convenções
